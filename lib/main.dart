@@ -4,6 +4,7 @@ import 'ble/fake_nexgen_controller.dart';
 import 'ble/nexgen_ble.dart';
 import 'ble/nexgen_controller.dart';
 import 'nexgen_brand.dart';
+import 'ui/device_picker.dart';
 import 'ui/keypad.dart';
 
 void main() {
@@ -72,25 +73,17 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _connectFlow() async {
     if (demoMode) {
       // Fake connect (no hardware)
-      await ble.connect(BluetoothDevice(remoteId: const DeviceIdentifier('DEMO')));
+      await ble.connect(
+        BluetoothDevice(remoteId: const DeviceIdentifier('DEMO')),
+      );
       return;
     }
 
-    await ble.startScan();
-
-    // naive: take first device that advertises our service
-    final sub = ble.scanResults().listen((r) async {
-      if (r.advertisementData.serviceUuids
-          .map((u) => u.toLowerCase())
-          .contains(NexgenBleUuids.service.str.toLowerCase())) {
-        await ble.stopScan();
-        await ble.connect(r.device);
-      }
-    });
-
-    await Future<void>.delayed(const Duration(seconds: 7));
-    await ble.stopScan();
-    await sub.cancel();
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => DevicePickerScreen(ble: ble),
+      ),
+    );
   }
 
   Color _stateColor() {
