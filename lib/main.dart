@@ -31,6 +31,8 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
+enum PendingAction { none, lock, unlock, setPinEnter, setPinConfirm }
+
 class _HomeScreenState extends State<HomeScreen> {
   // Demo mode: lets you test UI without hardware.
   bool demoMode = true;
@@ -41,7 +43,9 @@ class _HomeScreenState extends State<HomeScreen> {
   BleConnState connState = BleConnState.disconnected;
   String status = '';
 
+  PendingAction action = PendingAction.none;
   String pin = '';
+  String newPinFirst = '';
 
   void _initController() {
     ble = demoMode
@@ -97,6 +101,73 @@ class _HomeScreenState extends State<HomeScreen> {
         return Colors.greenAccent;
       case SafeLockState.unknown:
         return Colors.amberAccent;
+    }
+  }
+
+  String _promptText() {
+    if (connState != BleConnState.connected) return 'Connect to a safe';
+
+    switch (action) {
+      case PendingAction.none:
+        return 'Choose an action';
+      case PendingAction.lock:
+        return 'Enter PIN to LOCK';
+      case PendingAction.unlock:
+        return 'Enter PIN to UNLOCK';
+      case PendingAction.setPinEnter:
+        return 'Enter NEW PIN';
+      case PendingAction.setPinConfirm:
+        return 'Confirm NEW PIN';
+    }
+  }
+
+  void _clearEntry() {
+    setState(() {
+      pin = '';
+    });
+  }
+
+  void _resetFlow() {
+    setState(() {
+      action = PendingAction.none;
+      pin = '';
+      newPinFirst = '';
+    });
+  }
+
+  Future<void> _submitPinIfReady() async {
+    if (pin.length != 4) return;
+
+    try {
+      switch (action) {
+        case PendingAction.lock:
+          await ble.lock(pin);
+          _resetFlow();
+          return;
+        case PendingAction.unlock:
+          await ble.unlock(pin);
+          _resetFlow();
+          return;
+        case PendingAction.setPinEnter:
+          setState(() {
+            newPinFirst = pin;
+            pin = '';
+            action = PendingAction.setPinConfirm;
+          });
+          return;
+        case PendingAction.setPinConfirm:
+          final confirm = pin;
+          await ble.setPin(newPinFirst, confirm);
+          _resetFlow();
+          return;
+        case PendingAction.none:
+          return;
+      }
+    } catch (e) {
+      // leave flow as-is; status stream will likely show error too
+      setState(() {
+        status = e.toString();
+      });
     }
   }
 
@@ -183,10 +254,63 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    'PIN',
-                    style: TextStyle(color: Colors.white.withOpacity(0.8)),
+                    _promptText(),
+                    style: TextStyle(color: Colors.white.withOpacity(0.85)),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
+
+                  // Action buttons (tap first)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: isConnected
+                              ? () {
+                                  setState(() {
+                                    action = PendingAction.lock;
+                                    pin = '';
+                                  });
+                                }
+                              : null,
+                          child: const Text('Lock'),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: FilledButton.tonal(
+                          onPressed: isConnected
+                              ? () {
+                                  setState(() {
+                                    action = PendingAction.unlock;
+                                    pin = '';
+                                  });
+                                }
+                              : null,
+                          child: const Text('Unlock'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: isConnected
+                          ? () {
+                              setState(() {
+                                action = PendingAction.setPinEnter;
+                                pin = '';
+                                newPinFirst = '';
+                              });
+                            }
+                          : null,
+                      child: const Text('Set PIN'),
+                    ),
+                  ),
+
+                  const Divider(height: 24),
+
+                  // PIN display
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: List.generate(4, (i) {
@@ -205,8 +329,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     }),
                   ),
                   const SizedBox(height: 16),
+
                   NexgenKeypad(
                     onDigit: (d) {
+                      if (action == PendingAction.none) return;
                       if (pin.length >= 4) return;
                       setState(() => pin += d);
                     },
@@ -214,32 +340,18 @@ class _HomeScreenState extends State<HomeScreen> {
                       if (pin.isEmpty) return;
                       setState(() => pin = pin.substring(0, pin.length - 1));
                     },
-                    onClear: () => setState(() => pin = ''),
-                    onSubmit: () {
-                      // no-op for now (we'll use this for unlock/lock/confirm flows)
+                    onClear: _clearEntry,
+                    onSubmit: () async {
+                      await _submitPinIfReady();
                     },
                   ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: FilledButton(
-                          onPressed: isConnected && pin.length == 4
-                              ? () => ble.lock(pin)
-                              : null,
-                          child: const Text('Lock'),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: FilledButton.tonal(
-                          onPressed: isConnected && pin.length == 4
-                              ? () => ble.unlock(pin)
-                              : null,
-                          child: const Text('Unlock'),
-                        ),
-                      ),
-                    ],
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton(
+                      onPressed: action == PendingAction.none ? null : _resetFlow,
+                      child: const Text('Cancel'),
+                    ),
                   ),
                 ],
               ),
