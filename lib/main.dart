@@ -6,6 +6,7 @@ import 'ble/nexgen_controller.dart';
 import 'nexgen_brand.dart';
 import 'ui/device_picker.dart';
 import 'ui/keypad.dart';
+import 'ui/settings_screen.dart';
 
 void main() {
   runApp(const NexgenSafeApp());
@@ -181,26 +182,39 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Nexgen Safe'),
+        title: Row(
+          children: [
+            Image.asset('assets/branding/logo_mark.png', width: 24, height: 24),
+            const SizedBox(width: 10),
+            const Text('Nexgen Safe'),
+          ],
+        ),
         actions: [
-          Row(
-            children: [
-              const Text('Demo', style: TextStyle(fontSize: 12)),
-              Switch(
-                value: demoMode,
-                onChanged: (v) async {
-                  await ble.disconnect();
-                  ble.dispose();
-                  setState(() {
-                    demoMode = v;
-                    connState = BleConnState.disconnected;
-                    lockState = SafeLockState.unknown;
-                    status = '';
-                    _initController();
-                  });
-                },
-              ),
-            ],
+          IconButton(
+            tooltip: 'Settings',
+            icon: const Icon(Icons.settings),
+            onPressed: () async {
+              await Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => SettingsScreen(
+                    demoMode: demoMode,
+                    ble: ble,
+                    onDemoModeChanged: (v) async {
+                      await ble.disconnect();
+                      ble.dispose();
+                      if (!mounted) return;
+                      setState(() {
+                        demoMode = v;
+                        connState = BleConnState.disconnected;
+                        lockState = SafeLockState.unknown;
+                        status = '';
+                        _initController();
+                      });
+                    },
+                  ),
+                ),
+              );
+            },
           ),
           TextButton(
             onPressed: isConnected ? () => ble.disconnect() : _connectFlow,
