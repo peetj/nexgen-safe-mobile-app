@@ -26,6 +26,7 @@
 #include <hd44780ioClass/hd44780_I2Cexp.h>
 
 #include <NimBLEDevice.h>
+#include <EEPROM.h>
 
 #include "SafeState.h"
 #include "icons.h"
@@ -149,6 +150,28 @@ static void statusErr(const char* code) {
   chStatus->notify();
 }
 
+// Verify PIN against EEPROM *without* changing lock state.
+// Mirrors SafeState::unlock logic but does not call setLock(false).
+static bool verifyPinNoSideEffects(const String& code) {
+  const uint8_t EEPROM_ADDR_CODE_LEN = 1;
+  const uint8_t EEPROM_ADDR_CODE = 2;
+  const uint8_t EEPROM_EMPTY = 0xff;
+
+  uint8_t codeLength = EEPROM.read(EEPROM_ADDR_CODE_LEN);
+  if (codeLength == EEPROM_EMPTY) {
+    // No code set => accept any PIN
+    return true;
+  }
+
+  if (code.length() != codeLength) return false;
+
+  for (uint8_t i = 0; i < codeLength; i++) {
+    uint8_t stored = EEPROM.read(EEPROM_ADDR_CODE + i);
+    if (stored != (uint8_t)code[i]) return false;
+  }
+  return true;
+}
+
 // -----------------------------
 // BLE callbacks
 // -----------------------------
@@ -173,9 +196,9 @@ class CmdCallbacks : public NimBLECharacteristicCallbacks {
         return;
       }
 
-      // For lock we just require correct pin *if a pin exists*.
+      // For lock we require the correct PIN if a PIN exists.
       // If no code is set, allow lock after setting one at keypad or via SETPIN.
-      if (safeState.hasCode() && !safeState.check(pin)) {
+      if (safeState.hasCode() && !verifyPinNoSideEffects(pin)) {
         statusErr("BAD_PIN");
         return;
       }
