@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Nexgen Safe</title>
+  <style>
+    :root{
+      --orange:#FF5E19;
+      --charcoal:#15181E;
+      --offwhite:#F2F2F0;
+      --pink:#FF2D95;
+    }
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;background:var(--charcoal);color:var(--offwhite);}
+    header{display:flex;align-items:center;gap:10px;padding:16px;border-bottom:1px solid rgba(242,242,240,.1)}
+    header h1{font-size:18px;margin:0}
+    .wrap{max-width:520px;margin:0 auto;padding:16px}
+    .card{background:rgba(255,255,255,.04);border:1px solid rgba(242,242,240,.08);border-radius:16px;padding:16px;margin-bottom:12px}
+    .row{display:flex;gap:10px}
+    button{appearance:none;border:0;border-radius:14px;padding:14px 14px;font-weight:700;cursor:pointer}
+    button.primary{background:var(--orange);color:#111}
+    button.tonal{background:rgba(255,94,25,.15);color:var(--offwhite);border:1px solid rgba(255,94,25,.35)}
+    button.ghost{background:transparent;color:var(--offwhite);border:1px solid rgba(242,242,240,.18)}
+    button:disabled{opacity:.45;cursor:not-allowed}
+    .dots{display:flex;justify-content:center;gap:18px;padding:10px 0 16px}
+    .dot{width:14px;height:14px;border-radius:50%;background:rgba(242,242,240,.18)}
+    .dot.filled{background:var(--offwhite)}
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+    .key{background:rgba(242,242,240,.06);border:1px solid rgba(242,242,240,.1);color:var(--offwhite);font-size:20px}
+    .hint{color:rgba(242,242,240,.7);font-size:12px;line-height:1.35}
+    .status{display:flex;align-items:center;gap:8px}
+    .pill{width:10px;height:10px;border-radius:50%;background:#fbbf24}
+    .pill.locked{background:#fb7185}
+    .pill.unlocked{background:#34d399}
+    input{width:100%;box-sizing:border-box;padding:12px;border-radius:12px;border:1px solid rgba(242,242,240,.14);background:rgba(0,0,0,.2);color:var(--offwhite)}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Nexgen Safe</h1>
+  </header>
+  <div class="wrap">
+    <div class="card">
+      <div class="status">
+        <div id="pill" class="pill"></div>
+        <div><b id="state">UNKNOWN</b> <span style="opacity:.7" id="name"></span></div>
+        <div style="margin-left:auto;opacity:.7" id="ip">192.168.4.1</div>
+      </div>
+      <p class="hint" style="margin:10px 0 0">
+        Connect your phone to the safe’s Wi‑Fi, then use this page.
+      </p>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <button id="lockBtn" class="primary">Lock</button>
+        <button id="unlockBtn" class="tonal">Unlock</button>
+      </div>
+      <div style="height:10px"></div>
+      <button id="setPinBtn" class="ghost" style="width:100%">Set PIN</button>
+      <div style="height:16px"></div>
+      <div class="hint" id="prompt">Choose an action</div>
+      <div class="dots" id="dots"></div>
+      <div class="grid" id="grid"></div>
+      <div style="height:10px"></div>
+      <button id="cancelBtn" class="ghost" style="width:100%">Cancel</button>
+    </div>
+
+    <div class="card">
+      <div class="hint" style="margin-bottom:8px">LCD (optional)</div>
+      <input id="l1" placeholder="Line 1" value="Nexgen Safe" />
+      <div style="height:10px"></div>
+      <input id="l2" placeholder="Line 2" value="Use the app" />
+      <div style="height:10px"></div>
+      <button id="lcdBtn" class="ghost" style="width:100%">Write to LCD</button>
+    </div>
+  </div>
+
+<script>
+  const apiBase = 'http://192.168.4.1';
+  const stateEl = document.getElementById('state');
+  const nameEl = document.getElementById('name');
+  const pillEl = document.getElementById('pill');
+
+  const promptEl = document.getElementById('prompt');
+  const dotsEl = document.getElementById('dots');
+  const gridEl = document.getElementById('grid');
+
+  const lockBtn = document.getElementById('lockBtn');
+  const unlockBtn = document.getElementById('unlockBtn');
+  const setPinBtn = document.getElementById('setPinBtn');
+  const cancelBtn = document.getElementById('cancelBtn');
+
+  const lcdBtn = document.getElementById('lcdBtn');
+  const l1 = document.getElementById('l1');
+  const l2 = document.getElementById('l2');
+
+  let action = 'none';
+  let pin = '';
+  let pin1 = '';
+
+  function renderDots(){
+    dotsEl.innerHTML = '';
+    for(let i=0;i<4;i++){
+      const d=document.createElement('div');
+      d.className='dot' + (i<pin.length?' filled':'');
+      dotsEl.appendChild(d);
+    }
+  }
+
+  function setPrompt(){
+    if(action==='none') promptEl.textContent='Choose an action';
+    if(action==='lock') promptEl.textContent='Enter PIN to LOCK';
+    if(action==='unlock') promptEl.textContent='Enter PIN to UNLOCK';
+    if(action==='set1') promptEl.textContent='Enter NEW PIN';
+    if(action==='set2') promptEl.textContent='Confirm NEW PIN';
+  }
+
+  function resetFlow(){
+    action='none';
+    pin='';
+    pin1='';
+    setPrompt();
+    renderDots();
+  }
+
+  async function api(path, body){
+    const res = await fetch(apiBase+path, {
+      method: body ? 'POST':'GET',
+      headers: body ? {'Content-Type':'application/json'} : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    return await res.json().catch(()=>({ok:false, err:'BAD_JSON'}));
+  }
+
+  async function refreshStatus(){
+    try{
+      const j = await api('/status');
+      nameEl.textContent = j.name ? `(${j.name})` : '';
+      if(j.locked===true){
+        stateEl.textContent='LOCKED';
+        pillEl.className='pill locked';
+      }else if(j.locked===false){
+        stateEl.textContent='UNLOCKED';
+        pillEl.className='pill unlocked';
+      }else{
+        stateEl.textContent='UNKNOWN';
+        pillEl.className='pill';
+      }
+    }catch(e){
+      stateEl.textContent='OFFLINE';
+      pillEl.className='pill';
+    }
+  }
+
+  function addKey(label, onClick){
+    const b=document.createElement('button');
+    b.className='key';
+    b.textContent=label;
+    b.onclick=onClick;
+    gridEl.appendChild(b);
+  }
+
+  function buildKeypad(){
+    gridEl.innerHTML='';
+    ['1','2','3','4','5','6','7','8','9'].forEach(d=>addKey(d, ()=>digit(d)));
+    addKey('⌫', back);
+    addKey('0', ()=>digit('0'));
+    addKey('✓', submit);
+  }
+
+  function digit(d){
+    if(action==='none') return;
+    if(pin.length>=4) return;
+    pin += d;
+    renderDots();
+  }
+  function back(){
+    if(pin.length===0) return;
+    pin = pin.slice(0,-1);
+    renderDots();
+  }
+
+  async function submit(){
+    if(pin.length!==4) return;
+    if(action==='lock'){
+      await api('/lock', {pin});
+      resetFlow();
+      refreshStatus();
+    }
+    if(action==='unlock'){
+      await api('/unlock', {pin});
+      resetFlow();
+      refreshStatus();
+    }
+    if(action==='set1'){
+      pin1 = pin;
+      pin = '';
+      action='set2';
+      setPrompt();
+      renderDots();
+    }
+    if(action==='set2'){
+      await api('/setpin', {pin1, pin2: pin});
+      resetFlow();
+      refreshStatus();
+    }
+  }
+
+  lockBtn.onclick=()=>{action='lock';pin='';setPrompt();renderDots();};
+  unlockBtn.onclick=()=>{action='unlock';pin='';setPrompt();renderDots();};
+  setPinBtn.onclick=()=>{action='set1';pin='';pin1='';setPrompt();renderDots();};
+  cancelBtn.onclick=resetFlow;
+
+  lcdBtn.onclick=async()=>{
+    await api('/lcd', {line1:l1.value, line2:l2.value});
+  };
+
+  buildKeypad();
+  resetFlow();
+  refreshStatus();
+  setInterval(refreshStatus, 2000);
+</script>
+</body>
+</html>
