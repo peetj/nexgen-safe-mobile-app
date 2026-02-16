@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'ble/fake_nexgen_controller.dart';
 import 'ble/nexgen_ble.dart';
+import 'ble/nexgen_controller.dart';
 import 'nexgen_brand.dart';
 
 void main() {
@@ -29,7 +31,10 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final NexgenBleController ble = NexgenBleController();
+  // Demo mode: lets you test UI without hardware.
+  bool demoMode = true;
+
+  late NexgenController ble;
 
   SafeLockState lockState = SafeLockState.unknown;
   BleConnState connState = BleConnState.disconnected;
@@ -37,12 +42,20 @@ class _HomeScreenState extends State<HomeScreen> {
 
   final pinController = TextEditingController();
 
-  @override
-  void initState() {
-    super.initState();
+  void _initController() {
+    ble = demoMode
+        ? FakeNexgenController()
+        : RealNexgenController(NexgenBleController());
+
     ble.connState.listen((s) => setState(() => connState = s));
     ble.lockState.listen((s) => setState(() => lockState = s));
     ble.statusText.listen((t) => setState(() => status = t));
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _initController();
   }
 
   @override
@@ -53,11 +66,16 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _connectFlow() async {
+    if (demoMode) {
+      // Fake connect (no hardware)
+      await ble.connect(BluetoothDevice(remoteId: const DeviceIdentifier('DEMO')));
+      return;
+    }
+
     await ble.startScan();
 
     // naive: take first device that advertises our service
     final sub = ble.scanResults().listen((r) async {
-      // You can also filter by name here.
       if (r.advertisementData.serviceUuids
           .map((u) => u.toLowerCase())
           .contains(NexgenBleUuids.service.str.toLowerCase())) {
@@ -101,6 +119,25 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text('Nexgen Safe'),
         actions: [
+          Row(
+            children: [
+              const Text('Demo', style: TextStyle(fontSize: 12)),
+              Switch(
+                value: demoMode,
+                onChanged: (v) async {
+                  await ble.disconnect();
+                  ble.dispose();
+                  setState(() {
+                    demoMode = v;
+                    connState = BleConnState.disconnected;
+                    lockState = SafeLockState.unknown;
+                    status = '';
+                    _initController();
+                  });
+                },
+              ),
+            ],
+          ),
           TextButton(
             onPressed: isConnected ? () => ble.disconnect() : _connectFlow,
             child: Text(
