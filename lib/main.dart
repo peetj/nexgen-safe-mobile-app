@@ -4,6 +4,7 @@ import 'ble/fake_nexgen_controller.dart';
 import 'ble/nexgen_ble.dart';
 import 'ble/nexgen_controller.dart';
 import 'nexgen_brand.dart';
+import 'ui/keypad.dart';
 
 void main() {
   runApp(const NexgenSafeApp());
@@ -40,7 +41,7 @@ class _HomeScreenState extends State<HomeScreen> {
   BleConnState connState = BleConnState.disconnected;
   String status = '';
 
-  final pinController = TextEditingController();
+  String pin = '';
 
   void _initController() {
     ble = demoMode
@@ -60,7 +61,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
-    pinController.dispose();
     ble.dispose();
     super.dispose();
   }
@@ -172,37 +172,77 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             const SizedBox(height: 24),
 
-            TextField(
-              controller: pinController,
-              keyboardType: TextInputType.number,
-              maxLength: 4,
-              decoration: const InputDecoration(
-                labelText: 'PIN (4 digits)',
-                border: OutlineInputBorder(),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                color: Colors.white.withOpacity(0.06),
+                border: Border.all(color: Colors.white.withOpacity(0.08)),
               ),
-            ),
-            const SizedBox(height: 12),
-
-            Row(
-              children: [
-                Expanded(
-                  child: FilledButton(
-                    onPressed: isConnected
-                        ? () => ble.lock(pinController.text)
-                        : null,
-                    child: const Text('Lock'),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'PIN',
+                    style: TextStyle(color: Colors.white.withOpacity(0.8)),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: FilledButton.tonal(
-                    onPressed: isConnected
-                        ? () => ble.unlock(pinController.text)
-                        : null,
-                    child: const Text('Unlock'),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(4, (i) {
+                      final filled = i < pin.length;
+                      return Container(
+                        width: 16,
+                        height: 16,
+                        margin: const EdgeInsets.symmetric(horizontal: 10),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: filled
+                              ? Colors.white
+                              : Colors.white.withOpacity(0.18),
+                        ),
+                      );
+                    }),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 16),
+                  NexgenKeypad(
+                    onDigit: (d) {
+                      if (pin.length >= 4) return;
+                      setState(() => pin += d);
+                    },
+                    onBackspace: () {
+                      if (pin.isEmpty) return;
+                      setState(() => pin = pin.substring(0, pin.length - 1));
+                    },
+                    onClear: () => setState(() => pin = ''),
+                    onSubmit: () {
+                      // no-op for now (we'll use this for unlock/lock/confirm flows)
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: isConnected && pin.length == 4
+                              ? () => ble.lock(pin)
+                              : null,
+                          child: const Text('Lock'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: FilledButton.tonal(
+                          onPressed: isConnected && pin.length == 4
+                              ? () => ble.unlock(pin)
+                              : null,
+                          child: const Text('Unlock'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 16),
 
