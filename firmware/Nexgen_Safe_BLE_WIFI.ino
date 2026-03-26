@@ -41,6 +41,7 @@
 
 #include "SafeState.h"
 #include "icons.h"
+#include "web_ui.h"
 
 // -----------------------------
 // Config
@@ -202,8 +203,8 @@ static void httpOkStatus() {
 
 static void setupHttp() {
   server.on("/", HTTP_GET, []() {
-    server.sendHeader("Access-Control-Allow-Origin", "*");
-    server.send(200, "text/plain", "Nexgen Safe API");
+    server.sendHeader("Cache-Control", "no-store");
+    server.send_P(200, "text/html; charset=utf-8", INDEX_HTML);
   });
 
   server.on("/status", HTTP_GET, []() { httpOkStatus(); });
@@ -234,6 +235,7 @@ static void setupHttp() {
     String p2 = jsonGet(body, "pin2");
     if (!is4Digits(p1) || !is4Digits(p2)) return httpJson(400, "{\"ok\":false,\"err\":\"BAD_FORMAT\"}");
     if (p1 != p2) return httpJson(400, "{\"ok\":false,\"err\":\"PIN_MISMATCH\"}");
+    if (safeState.locked()) return httpJson(409, "{\"ok\":false,\"err\":\"LOCKED\"}");
     safeState.setCode(p1);
     httpJson(200, "{\"ok\":true}");
   });
@@ -318,6 +320,7 @@ class CmdCallbacks : public NimBLECharacteristicCallbacks {
       a.trim(); b.trim();
       if (!is4Digits(a) || !is4Digits(b)) { statusErr("BAD_FORMAT"); return; }
       if (a != b) { statusErr("PIN_MISMATCH"); return; }
+      if (safeState.locked()) { statusErr("LOCKED"); return; }
       safeState.setCode(a);
       statusOk();
       return;
@@ -359,7 +362,7 @@ static void setupBle() {
 
   NimBLEAdvertising* adv = NimBLEDevice::getAdvertising();
   adv->addServiceUUID(UUID_SVC);
-  adv->setScanResponse(true);
+  adv->enableScanResponse(true);
   adv->start();
 }
 
@@ -518,6 +521,7 @@ void setup() {
   safeState.begin(64);
 
   initLcdOrHalt();
+  init_icons(lcd);
 
   lockServo.setPeriodHertz(50);
   lockServo.attach(SERVO_PIN, 500, 2400);

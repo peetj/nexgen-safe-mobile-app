@@ -248,6 +248,10 @@ class CmdCallbacks : public NimBLECharacteristicCallbacks {
         statusErr("PIN_MISMATCH");
         return;
       }
+      if (safeState.locked()) {
+        statusErr("LOCKED");
+        return;
+      }
       safeState.setCode(a);
       statusOk();
       return;
@@ -299,7 +303,7 @@ static void setupBle() {
 
   NimBLEAdvertising* adv = NimBLEDevice::getAdvertising();
   adv->addServiceUUID(UUID_SVC);
-  adv->setScanResponse(true);
+  adv->enableScanResponse(true);
   adv->start();
 }
 
@@ -468,6 +472,7 @@ void setup() {
   safeState.begin(64);
 
   initLcdOrHalt();
+  init_icons(lcd);
 
   lockServo.setPeriodHertz(50);
   lockServo.attach(SERVO_PIN, 500, 2400);

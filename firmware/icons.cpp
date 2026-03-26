@@ -25,7 +25,7 @@ const byte iconUnlocked[8]PROGMEM = {
   0b00000,
 };
 
-void init_icons(LiquidCrystal_I2C &lcd) {
+void init_icons(hd44780 &lcd) {
   byte icon[8];
   memcpy_P(icon, iconLocked, sizeof(icon));
   lcd.createChar(ICON_LOCKED_CHAR, icon);

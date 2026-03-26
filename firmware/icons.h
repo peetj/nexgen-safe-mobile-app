@@ -1,8 +1,7 @@
 #ifndef ICONS_H
 #define ICONS_H
 
-
-#include <LiquidCrystal_I2C.h>
+#include <hd44780.h>
 
 
 // Our custom icon numbers
@@ -12,6 +11,6 @@
 // This is a standard icon on the LCD1602 character set
 #define ICON_RIGHT_ARROW   (byte)126
 
-void init_icons(LiquidCrystal_I2C &lcd);
+void init_icons(hd44780 &lcd);
 
 #endif /* ICONS_H */

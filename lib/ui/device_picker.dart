@@ -45,16 +45,17 @@ class _DevicePickerScreenState extends State<DevicePickerScreen> {
 
       _sub = widget.ble.scanResults().listen((r) {
         final uuids = r.advertisementData.serviceUuids
-            .map((u) => u.toLowerCase())
+            .map((u) => u.str.toLowerCase())
             .toList();
-        final isNexgenSafe = uuids.contains(NexgenBleUuids.service.str.toLowerCase());
+        final isNexgenSafe = uuids.contains(
+          NexgenBleUuids.service.str.toLowerCase(),
+        );
         if (!isNexgenSafe) return;
         setState(() {
           _results[r.device.remoteId] = r;
         });
       });
 
-      // stop scan after a bit (we can refresh)
       await Future<void>.delayed(const Duration(seconds: 8));
       await widget.ble.stopScan();
     } catch (e) {
@@ -78,7 +79,10 @@ class _DevicePickerScreenState extends State<DevicePickerScreen> {
           title: const Text('Connection failed'),
           content: Text(e.toString()),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK')),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
           ],
         ),
       );
@@ -98,7 +102,7 @@ class _DevicePickerScreenState extends State<DevicePickerScreen> {
             onPressed: _scanning ? null : _start,
             icon: const Icon(Icons.refresh),
             tooltip: 'Rescan',
-          )
+          ),
         ],
       ),
       body: Padding(
@@ -109,7 +113,10 @@ class _DevicePickerScreenState extends State<DevicePickerScreen> {
             if (_error.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
-                child: Text(_error, style: const TextStyle(color: Colors.redAccent)),
+                child: Text(
+                  _error,
+                  style: const TextStyle(color: Colors.redAccent),
+                ),
               ),
             if (_scanning)
               const Padding(
@@ -125,7 +132,9 @@ class _DevicePickerScreenState extends State<DevicePickerScreen> {
               child: items.isEmpty
                   ? Center(
                       child: Text(
-                        _scanning ? 'Scanning…' : 'No Nexgen Safe devices found',
+                        _scanning
+                            ? 'Scanning...'
+                            : 'No Nexgen Safe devices found',
                         style: TextStyle(color: Colors.white.withOpacity(0.8)),
                       ),
                     )
@@ -136,7 +145,9 @@ class _DevicePickerScreenState extends State<DevicePickerScreen> {
                         final r = items[i];
                         final name = r.advertisementData.advName.isNotEmpty
                             ? r.advertisementData.advName
-                            : (r.device.platformName.isNotEmpty ? r.device.platformName : 'Unnamed');
+                            : (r.device.platformName.isNotEmpty
+                                ? r.device.platformName
+                                : 'Unnamed');
                         return ListTile(
                           title: Text(name),
                           subtitle: Text(r.device.remoteId.str),

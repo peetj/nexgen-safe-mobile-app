@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'ble/fake_nexgen_controller.dart';
 import 'ble/nexgen_ble.dart';
 import 'ble/nexgen_controller.dart';
+import 'network/nexgen_http.dart';
 import 'nexgen_brand.dart';
+import 'nexgen_transport.dart';
 import 'ui/device_picker.dart';
 import 'ui/keypad.dart';
 import 'ui/settings_screen.dart';
@@ -36,13 +38,13 @@ class HomeScreen extends StatefulWidget {
 enum PendingAction { none, lock, unlock, setPinEnter, setPinConfirm }
 
 class _HomeScreenState extends State<HomeScreen> {
-  // Demo mode: lets you test UI without hardware.
-  bool demoMode = true;
+  NexgenTransport transport = NexgenTransport.wifiAp;
+  String wifiBaseUrl = 'http://192.168.4.1';
 
-  late NexgenController ble;
+  late NexgenController controller;
 
   SafeLockState lockState = SafeLockState.unknown;
-  BleConnState connState = BleConnState.disconnected;
+  NexgenConnState connState = NexgenConnState.disconnected;
   String status = '';
 
   PendingAction action = PendingAction.none;
@@ -50,13 +52,15 @@ class _HomeScreenState extends State<HomeScreen> {
   String newPinFirst = '';
 
   void _initController() {
-    ble = demoMode
-        ? FakeNexgenController()
-        : RealNexgenController(NexgenBleController());
+    controller = switch (transport) {
+      NexgenTransport.demo => FakeNexgenController(),
+      NexgenTransport.ble => RealNexgenController(NexgenBleController()),
+      NexgenTransport.wifiAp => NexgenHttpController(baseUrl: wifiBaseUrl),
+    };
 
-    ble.connState.listen((s) => setState(() => connState = s));
-    ble.lockState.listen((s) => setState(() => lockState = s));
-    ble.statusText.listen((t) => setState(() => status = t));
+    controller.connState.listen((s) => setState(() => connState = s));
+    controller.lockState.listen((s) => setState(() => lockState = s));
+    controller.statusText.listen((t) => setState(() => status = t));
   }
 
   @override
@@ -67,24 +71,47 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
-    ble.dispose();
+    controller.dispose();
     super.dispose();
   }
 
   Future<void> _connectFlow() async {
-    if (demoMode) {
-      // Fake connect (no hardware)
-      await ble.connect(
-        BluetoothDevice(remoteId: const DeviceIdentifier('DEMO')),
+    if (transport == NexgenTransport.demo) {
+      await controller.connect();
+      return;
+    }
+
+    if (transport == NexgenTransport.ble) {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => DevicePickerScreen(ble: controller),
+        ),
       );
       return;
     }
 
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => DevicePickerScreen(ble: ble),
-      ),
-    );
+    try {
+      await controller.connect();
+    } catch (e) {
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('Wi-Fi connection failed'),
+          content: Text(
+            'Join the ESP32 hotspot first, then try Connect again.\n\n'
+            'Expected API URL: $wifiBaseUrl\n\n'
+            'Details: $e',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   Color _stateColor() {
@@ -99,7 +126,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   String _promptText() {
-    if (connState != BleConnState.connected) return 'Connect to a safe';
+    if (connState != NexgenConnState.connected) {
+      return transport == NexgenTransport.wifiAp
+          ? 'Join the safe Wi-Fi, then tap Connect'
+          : 'Connect to a safe';
+    }
 
     switch (action) {
       case PendingAction.none:
@@ -135,11 +166,11 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       switch (action) {
         case PendingAction.lock:
-          await ble.lock(pin);
+          await controller.lock(pin);
           _resetFlow();
           return;
         case PendingAction.unlock:
-          await ble.unlock(pin);
+          await controller.unlock(pin);
           _resetFlow();
           return;
         case PendingAction.setPinEnter:
@@ -151,14 +182,13 @@ class _HomeScreenState extends State<HomeScreen> {
           return;
         case PendingAction.setPinConfirm:
           final confirm = pin;
-          await ble.setPin(newPinFirst, confirm);
+          await controller.setPin(newPinFirst, confirm);
           _resetFlow();
           return;
         case PendingAction.none:
           return;
       }
     } catch (e) {
-      // leave flow as-is; status stream will likely show error too
       setState(() {
         status = e.toString();
       });
@@ -178,7 +208,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isConnected = connState == BleConnState.connected;
+    final isConnected = connState == NexgenConnState.connected;
 
     return Scaffold(
       appBar: AppBar(
@@ -197,15 +227,20 @@ class _HomeScreenState extends State<HomeScreen> {
               await Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) => SettingsScreen(
-                    demoMode: demoMode,
-                    ble: ble,
-                    onDemoModeChanged: (v) async {
-                      await ble.disconnect();
-                      ble.dispose();
+                    transport: transport,
+                    wifiBaseUrl: wifiBaseUrl,
+                    controller: controller,
+                    onConnectionSettingsChanged:
+                        (nextTransport, nextWifiBaseUrl) async {
+                      await controller.disconnect();
+                      controller.dispose();
                       if (!mounted) return;
                       setState(() {
-                        demoMode = v;
-                        connState = BleConnState.disconnected;
+                        transport = nextTransport;
+                        wifiBaseUrl = nextWifiBaseUrl.isEmpty
+                            ? 'http://192.168.4.1'
+                            : nextWifiBaseUrl;
+                        connState = NexgenConnState.disconnected;
                         lockState = SafeLockState.unknown;
                         status = '';
                         _initController();
@@ -217,7 +252,7 @@ class _HomeScreenState extends State<HomeScreen> {
             },
           ),
           TextButton(
-            onPressed: isConnected ? () => ble.disconnect() : _connectFlow,
+            onPressed: isConnected ? () => controller.disconnect() : _connectFlow,
             child: Text(
               isConnected ? 'Disconnect' : 'Connect',
               style: const TextStyle(color: Colors.white),
@@ -225,11 +260,24 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            Text(
+              'Transport: ${transport.title}',
+              style: TextStyle(color: Colors.white.withOpacity(0.7)),
+            ),
+            if (transport == NexgenTransport.wifiAp)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  wifiBaseUrl,
+                  style: TextStyle(color: Colors.white.withOpacity(0.55)),
+                ),
+              ),
+            const SizedBox(height: 12),
             Row(
               children: [
                 CircleAvatar(radius: 6, backgroundColor: _stateColor()),
@@ -249,7 +297,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 style: TextStyle(color: Colors.white.withOpacity(0.75)),
               ),
             const SizedBox(height: 24),
-
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -265,8 +312,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     style: TextStyle(color: Colors.white.withOpacity(0.85)),
                   ),
                   const SizedBox(height: 10),
-
-                  // Action buttons (tap first)
                   Row(
                     children: [
                       Expanded(
@@ -314,10 +359,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: const Text('Set PIN'),
                     ),
                   ),
-
                   const Divider(height: 24),
-
-                  // PIN display
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: List.generate(4, (i) {
@@ -336,7 +378,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     }),
                   ),
                   const SizedBox(height: 16),
-
                   NexgenKeypad(
                     onDigit: (d) {
                       if (action == PendingAction.none) return;
@@ -364,22 +405,20 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             const SizedBox(height: 16),
-
             OutlinedButton(
               onPressed: isConnected
                   ? () async {
-                      // quick demo: overwrite LCD.
-                      await ble.lcdLine1('Nexgen Safe');
-                      await ble.lcdLine2('Use the app');
+                      await controller.lcdLine1('Nexgen Safe');
+                      await controller.lcdLine2('Use the app');
                     }
                   : null,
               child: const Text('Write to LCD'),
             ),
-
-            const Spacer(),
-
+            const SizedBox(height: 24),
             Text(
-              'Next: proper keypad UI + set PIN flow + device picker.',
+              transport == NexgenTransport.wifiAp
+                  ? 'Phone must join the ESP32 hotspot. No school Wi-Fi required.'
+                  : 'BLE remains available if you want direct Bluetooth control.',
               style: TextStyle(color: Colors.white.withOpacity(0.65)),
             ),
           ],

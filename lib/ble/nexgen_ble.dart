@@ -12,7 +12,7 @@ class NexgenBleUuids {
 
 enum SafeLockState { locked, unlocked, unknown }
 
-enum BleConnState { disconnected, scanning, connecting, connected }
+enum NexgenConnState { disconnected, scanning, connecting, connected }
 
 class NexgenBleController {
   NexgenBleController();
@@ -22,18 +22,16 @@ class NexgenBleController {
   BluetoothCharacteristic? _status;
   BluetoothCharacteristic? _lcd;
 
-  final _connState = StreamController<BleConnState>.broadcast();
+  final _connState = StreamController<NexgenConnState>.broadcast();
   final _lockState = StreamController<SafeLockState>.broadcast();
   final _statusText = StreamController<String>.broadcast();
 
-  Stream<BleConnState> get connState => _connState.stream;
+  Stream<NexgenConnState> get connState => _connState.stream;
   Stream<SafeLockState> get lockState => _lockState.stream;
   Stream<String> get statusText => _statusText.stream;
 
-  BluetoothDevice? get device => _device;
-
   Future<void> startScan({Duration timeout = const Duration(seconds: 6)}) async {
-    _connState.add(BleConnState.scanning);
+    _connState.add(NexgenConnState.scanning);
     await FlutterBluePlus.startScan(timeout: timeout);
   }
 
@@ -43,8 +41,12 @@ class NexgenBleController {
     await FlutterBluePlus.stopScan();
   }
 
-  Future<void> connect(BluetoothDevice device) async {
-    _connState.add(BleConnState.connecting);
+  Future<void> connect([BluetoothDevice? device]) async {
+    if (device == null) {
+      throw Exception('No Bluetooth device selected');
+    }
+
+    _connState.add(NexgenConnState.connecting);
     _device = device;
 
     await device.connect(timeout: const Duration(seconds: 12));
@@ -75,7 +77,7 @@ class NexgenBleController {
       if (text.startsWith('STATE:UNLOCKED')) _lockState.add(SafeLockState.unlocked);
     });
 
-    _connState.add(BleConnState.connected);
+    _connState.add(NexgenConnState.connected);
     await ping();
   }
 
@@ -88,7 +90,7 @@ class NexgenBleController {
     if (d != null) {
       await d.disconnect();
     }
-    _connState.add(BleConnState.disconnected);
+    _connState.add(NexgenConnState.disconnected);
     _lockState.add(SafeLockState.unknown);
   }
 

@@ -6,16 +6,14 @@ import 'nexgen_ble.dart';
 
 /// Shared interface so we can run the app in Demo Mode (no hardware) or Real BLE.
 abstract class NexgenController {
-  Stream<BleConnState> get connState;
+  Stream<NexgenConnState> get connState;
   Stream<SafeLockState> get lockState;
   Stream<String> get statusText;
-
-  BluetoothDevice? get device;
 
   Future<void> startScan({Duration timeout = const Duration(seconds: 6)});
   Stream<ScanResult> scanResults();
   Future<void> stopScan();
-  Future<void> connect(BluetoothDevice device);
+  Future<void> connect([BluetoothDevice? device]);
   Future<void> disconnect();
 
   Future<void> ping();
@@ -35,14 +33,11 @@ class RealNexgenController implements NexgenController {
   final NexgenBleController _inner;
 
   @override
-  Stream<BleConnState> get connState => _inner.connState;
+  Stream<NexgenConnState> get connState => _inner.connState;
   @override
   Stream<SafeLockState> get lockState => _inner.lockState;
   @override
   Stream<String> get statusText => _inner.statusText;
-
-  @override
-  BluetoothDevice? get device => _inner.device;
 
   @override
   Future<void> startScan({Duration timeout = const Duration(seconds: 6)}) =>
@@ -55,7 +50,7 @@ class RealNexgenController implements NexgenController {
   Future<void> stopScan() => _inner.stopScan();
 
   @override
-  Future<void> connect(BluetoothDevice device) => _inner.connect(device);
+  Future<void> connect([BluetoothDevice? device]) => _inner.connect(device);
 
   @override
   Future<void> disconnect() => _inner.disconnect();

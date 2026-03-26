@@ -9,13 +9,11 @@ import 'nexgen_controller.dart';
 ///
 /// Lets us test the full UI + flows with *no* ESP32 present.
 class FakeNexgenController implements NexgenController {
-  BluetoothDevice? _device;
-
-  final _connState = StreamController<BleConnState>.broadcast();
+  final _connState = StreamController<NexgenConnState>.broadcast();
   final _lockState = StreamController<SafeLockState>.broadcast();
   final _statusText = StreamController<String>.broadcast();
 
-  BleConnState _conn = BleConnState.disconnected;
+  NexgenConnState _conn = NexgenConnState.disconnected;
   SafeLockState _lock = SafeLockState.unlocked;
   String _pin = '1234';
 
@@ -25,7 +23,7 @@ class FakeNexgenController implements NexgenController {
   }
 
   @override
-  Stream<BleConnState> get connState => _connState.stream;
+  Stream<NexgenConnState> get connState => _connState.stream;
 
   @override
   Stream<SafeLockState> get lockState => _lockState.stream;
@@ -33,10 +31,7 @@ class FakeNexgenController implements NexgenController {
   @override
   Stream<String> get statusText => _statusText.stream;
 
-  @override
-  BluetoothDevice? get device => _device;
-
-  void _setConn(BleConnState s) {
+  void _setConn(NexgenConnState s) {
     _conn = s;
     _connState.add(s);
   }
@@ -49,7 +44,7 @@ class FakeNexgenController implements NexgenController {
 
   @override
   Future<void> startScan({Duration timeout = const Duration(seconds: 6)}) async {
-    _setConn(BleConnState.scanning);
+    _setConn(NexgenConnState.scanning);
     await Future<void>.delayed(const Duration(milliseconds: 400));
   }
 
@@ -60,22 +55,22 @@ class FakeNexgenController implements NexgenController {
 
   @override
   Future<void> stopScan() async {
-    if (_conn == BleConnState.scanning) _setConn(BleConnState.disconnected);
+    if (_conn == NexgenConnState.scanning) {
+      _setConn(NexgenConnState.disconnected);
+    }
   }
 
   @override
-  Future<void> connect(BluetoothDevice device) async {
-    _setConn(BleConnState.connecting);
+  Future<void> connect([BluetoothDevice? device]) async {
+    _setConn(NexgenConnState.connecting);
     await Future<void>.delayed(const Duration(milliseconds: 600));
-    _device = device;
-    _setConn(BleConnState.connected);
+    _setConn(NexgenConnState.connected);
     await ping();
   }
 
   @override
   Future<void> disconnect() async {
-    _device = null;
-    _setConn(BleConnState.disconnected);
+    _setConn(NexgenConnState.disconnected);
   }
 
   @override
