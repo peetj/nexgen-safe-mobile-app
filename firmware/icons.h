@@ -1,8 +1,7 @@
 #ifndef ICONS_H
 #define ICONS_H
 
-#include <hd44780.h>
-
+class hd44780;
 
 // Our custom icon numbers
 #define ICON_LOCKED_CHAR   (byte)0

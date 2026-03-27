@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <hd44780.h>
 #include "icons.h"
 
 
