@@ -1,10 +1,11 @@
 /*
-  Nexgen Safe (ESP32 + Keypad + Servo + I2C LCD) + BLE + Wi-Fi AP + HTTP API
+  Nexgen Safe (ESP32 + Keypad + Servo + I2C LCD) + Wi-Fi AP + HTTP API
 
   Why Wi-Fi AP:
   - Works on iPhone immediately (Safari can do HTTP; iOS Web Bluetooth is not available)
   - No school Wi-Fi dependency
   - Security-by-proximity: must join the safe's Wi-Fi to control it
+  - Browser-first target; BLE lives in Nexgen_Safe_BLE.ino if needed
 
   Network:
   - Open AP (no password) as requested
@@ -22,7 +23,6 @@
   - Shows WiFi on boot and leaves normal keypad UI afterwards.
 
   Libraries:
-  - NimBLE-Arduino
   - WebServer (built-in ESP32 Arduino core)
 */
 
@@ -37,8 +37,6 @@
 #include <WiFi.h>
 #include <WebServer.h>
 #include <ESPmDNS.h>
-
-#include <NimBLEDevice.h>
 
 #include "SafeState.h"
 #include "icons.h"
@@ -57,6 +55,10 @@ static const uint8_t SERVO_LOCK_POS   = 0;
 static const uint8_t SERVO_UNLOCK_POS = 90;
 
 static const uint8_t CODE_LEN = 4;
+static const uint8_t DEVICE_NAME_MAX_LEN = 31;
+static const uint8_t EEPROM_ADDR_DEVICE_NAME_LEN = 32;
+static const uint8_t EEPROM_ADDR_DEVICE_NAME = 33;
+static const uint8_t EEPROM_EMPTY = 0xff;
 
 // Keypad pins (R1..R4, C1..C3)
 static const uint8_t PIN_R1 = 14;
@@ -67,16 +69,6 @@ static const uint8_t PIN_R4 = 26;
 static const uint8_t PIN_C1 = 27;
 static const uint8_t PIN_C2 = 12;
 static const uint8_t PIN_C3 = 25;
-
-// -----------------------------
-// BLE UUIDs
-// -----------------------------
-static NimBLEUUID UUID_SVC("6e78676e-7361-6665-0000-000000000001");
-static NimBLEUUID UUID_CMD("6e78676e-7361-6665-0000-000000000002");
-static NimBLEUUID UUID_STATUS("6e78676e-7361-6665-0000-000000000003");
-static NimBLEUUID UUID_LCD("6e78676e-7361-6665-0000-000000000004");
-
-static NimBLECharacteristic* chStatus = nullptr;
 
 // -----------------------------
 // Hardware objects
@@ -100,7 +92,10 @@ byte colPins[COLS] = { PIN_C1, PIN_C2, PIN_C3 };
 Keypad keypad = Keypad(makeKeymap(keymap), rowPins, colPins, ROWS, COLS);
 
 SafeState safeState;
+static String deviceNameValue = DEVICE_NAME;
 static String deviceHostLabel;
+static bool restartPending = false;
+static unsigned long restartAtMs = 0;
 
 // -----------------------------
 // Wi-Fi + HTTP
@@ -126,6 +121,25 @@ static void lcdSetLine(uint8_t line, const String& text) {
   lcd.print("                ");
   lcd.setCursor(0, line);
   lcd.print(t);
+}
+
+static String normalizeDeviceName(const String& raw) {
+  String name = raw;
+  name.trim();
+  return name;
+}
+
+static bool isValidDeviceName(const String& name) {
+  if (name.length() == 0 || name.length() > DEVICE_NAME_MAX_LEN) return false;
+  for (size_t i = 0; i < name.length(); i++) {
+    char c = name[i];
+    bool ok = (c >= 'A' && c <= 'Z') ||
+              (c >= 'a' && c <= 'z') ||
+              (c >= '0' && c <= '9') ||
+              c == ' ' || c == '-' || c == '_';
+    if (!ok) return false;
+  }
+  return true;
 }
 
 static String makeHostLabel(const char* source) {
@@ -164,6 +178,52 @@ static String localAccessUrl() {
   return String("http://") + deviceHostLabel + ".local";
 }
 
+static void applyDeviceName(const String& name) {
+  deviceNameValue = name;
+  deviceHostLabel = makeHostLabel(deviceNameValue.c_str());
+}
+
+static void loadDeviceNameFromEeprom() {
+  uint8_t len = EEPROM.read(EEPROM_ADDR_DEVICE_NAME_LEN);
+  if (len == EEPROM_EMPTY || len == 0 || len > DEVICE_NAME_MAX_LEN) {
+    applyDeviceName(DEVICE_NAME);
+    return;
+  }
+
+  String stored;
+  stored.reserve(len);
+  for (uint8_t i = 0; i < len; i++) {
+    char c = (char)EEPROM.read(EEPROM_ADDR_DEVICE_NAME + i);
+    if (c == '\0' || c == (char)EEPROM_EMPTY) break;
+    stored += c;
+  }
+
+  stored = normalizeDeviceName(stored);
+  if (!isValidDeviceName(stored)) {
+    applyDeviceName(DEVICE_NAME);
+    return;
+  }
+
+  applyDeviceName(stored);
+}
+
+static void saveDeviceNameToEeprom(const String& name) {
+  uint8_t len = (uint8_t)name.length();
+  EEPROM.write(EEPROM_ADDR_DEVICE_NAME_LEN, len);
+  for (uint8_t i = 0; i < DEVICE_NAME_MAX_LEN; i++) {
+    uint8_t value = (i < len) ? (uint8_t)name[i] : 0;
+    EEPROM.write(EEPROM_ADDR_DEVICE_NAME + i, value);
+  }
+  EEPROM.commit();
+}
+
+static void scheduleRestart(const char* reason, unsigned long delayMs = 1500) {
+  restartPending = true;
+  restartAtMs = millis() + delayMs;
+  Serial.print("Restart scheduled: ");
+  Serial.println(reason);
+}
+
 static char readLoggedKey(const char* context) {
   char k = keypad.getKey();
   if (k) {
@@ -184,41 +244,18 @@ static bool is4Digits(const String& s) {
   return true;
 }
 
-static void notifyState() {
-  if (!chStatus) return;
-  chStatus->setValue(safeState.locked() ? "STATE:LOCKED" : "STATE:UNLOCKED");
-  chStatus->notify();
-}
-
 static void servoLock() {
   lockServo.write(SERVO_LOCK_POS);
   safeState.lock();
-  notifyState();
 }
 
 static void servoUnlock() {
   lockServo.write(SERVO_UNLOCK_POS);
 }
 
-static void statusOk() {
-  if (chStatus) {
-    chStatus->setValue("OK");
-    chStatus->notify();
-  }
-}
-
-static void statusErr(const char* code) {
-  if (chStatus) {
-    String msg = String("ERR:") + code;
-    chStatus->setValue(msg);
-    chStatus->notify();
-  }
-}
-
 static bool verifyPinNoSideEffects(const String& code) {
   const uint8_t EEPROM_ADDR_CODE_LEN = 1;
   const uint8_t EEPROM_ADDR_CODE = 2;
-  const uint8_t EEPROM_EMPTY = 0xff;
 
   uint8_t codeLength = EEPROM.read(EEPROM_ADDR_CODE_LEN);
   if (codeLength == EEPROM_EMPTY) return true;
@@ -252,7 +289,7 @@ static void httpJson(int code, const String& json) {
 }
 
 static void httpOkStatus() {
-  String json = String("{\"name\":\"") + DEVICE_NAME + "\",\"host\":\"" + deviceHostLabel + ".local\",\"url\":\"" + localAccessUrl() + "\",\"locked\":" + (safeState.locked() ? "true" : "false") + "}";
+  String json = String("{\"name\":\"") + deviceNameValue + "\",\"host\":\"" + deviceHostLabel + ".local\",\"url\":\"" + localAccessUrl() + "\",\"locked\":" + (safeState.locked() ? "true" : "false") + "}";
   httpJson(200, json);
 }
 
@@ -280,7 +317,6 @@ static void setupHttp() {
     bool ok = safeState.unlock(pin);
     if (!ok) return httpJson(403, "{\"ok\":false,\"err\":\"BAD_PIN\"}");
     servoUnlock();
-    notifyState();
     httpJson(200, "{\"ok\":true}");
   });
 
@@ -304,6 +340,29 @@ static void setupHttp() {
     httpJson(200, "{\"ok\":true}");
   });
 
+  server.on("/rename", HTTP_POST, []() {
+    String body = server.arg("plain");
+    String requestedName = normalizeDeviceName(jsonGet(body, "name"));
+    if (!isValidDeviceName(requestedName)) return httpJson(400, "{\"ok\":false,\"err\":\"BAD_NAME\"}");
+
+    String newHost = makeHostLabel(requestedName.c_str());
+    String newUrl = String("http://") + newHost + ".local";
+    bool restartRequired = requestedName != deviceNameValue;
+
+    saveDeviceNameToEeprom(requestedName);
+
+    Serial.print("Device rename requested: ");
+    Serial.println(requestedName);
+
+    String json = String("{\"ok\":true,\"restart_required\":") + (restartRequired ? "true" : "false") + ",\"name\":\"" + requestedName + "\",\"host\":\"" + newHost + ".local\",\"url\":\"" + newUrl + "\"}";
+    httpJson(200, json);
+  });
+
+  server.on("/restart", HTTP_POST, []() {
+    httpJson(200, "{\"ok\":true,\"restarting\":true}");
+    scheduleRestart("user requested restart", 350);
+  });
+
   server.onNotFound([]() {
     httpJson(404, "{\"ok\":false,\"err\":\"NOT_FOUND\"}");
   });
@@ -314,6 +373,8 @@ static void setupHttp() {
   server.on("/unlock", HTTP_OPTIONS, []() { httpJson(204, "{}"); });
   server.on("/setpin", HTTP_OPTIONS, []() { httpJson(204, "{}"); });
   server.on("/lcd", HTTP_OPTIONS, []() { httpJson(204, "{}"); });
+  server.on("/rename", HTTP_OPTIONS, []() { httpJson(204, "{}"); });
+  server.on("/restart", HTTP_OPTIONS, []() { httpJson(204, "{}"); });
 
   server.begin();
   Serial.println("HTTP server ready at http://192.168.4.1");
@@ -331,9 +392,8 @@ static bool setupWifiAp() {
   Serial.println();
   Serial.println("== WiFi AP setup ==");
   Serial.print("Requested SSID: ");
-  Serial.println(DEVICE_NAME);
+  Serial.println(deviceNameValue);
 
-  deviceHostLabel = makeHostLabel(DEVICE_NAME);
   WiFi.persistent(false);
   WiFi.disconnect(true, true);
   delay(100);
@@ -341,14 +401,14 @@ static bool setupWifiAp() {
   bool modeOk = WiFi.mode(WIFI_MODE_AP);
   bool configOk = WiFi.softAPConfig(apIp, apGateway, apSubnet);
   bool hostOk = WiFi.softAPsetHostname(deviceHostLabel.c_str());
-  bool apOk = WiFi.softAP(DEVICE_NAME); // open network
+  bool apOk = WiFi.softAP(deviceNameValue.c_str()); // open network
   delay(250);
 
   bool mdnsOk = false;
   if (apOk) {
     mdnsOk = MDNS.begin(deviceHostLabel.c_str());
     if (mdnsOk) {
-      MDNS.setInstanceName(DEVICE_NAME);
+      MDNS.setInstanceName(deviceNameValue);
       MDNS.enableWorkstation(ESP_IF_WIFI_AP);
       MDNS.addService("http", "tcp", 80);
     }
@@ -366,6 +426,8 @@ static bool setupWifiAp() {
   Serial.println(apOk ? "OK" : "FAIL");
   Serial.print("Active SSID: ");
   Serial.println(WiFi.softAPSSID());
+  Serial.print("Active device name: ");
+  Serial.println(deviceNameValue);
   Serial.print("AP hostname: ");
   Serial.println(deviceHostLabel);
   Serial.print("mDNS: ");
@@ -379,7 +441,7 @@ static bool setupWifiAp() {
 
   lcd.clear();
   if (apOk) {
-    lcdSetLine(0, "WiFi: " + String(DEVICE_NAME));
+    lcdSetLine(0, "WiFi: " + deviceNameValue);
     lcdSetLine(1, "IP: " + currentIp.toString());
     delay(1500);
   } else {
@@ -389,98 +451,6 @@ static bool setupWifiAp() {
   }
 
   return apOk;
-}
-
-// -----------------------------
-// BLE callbacks
-// -----------------------------
-class CmdCallbacks : public NimBLECharacteristicCallbacks {
-  void onWrite(NimBLECharacteristic* c, NimBLEConnInfo& connInfo) override {
-    std::string v = c->getValue();
-    String s(v.c_str());
-    s.trim();
-
-    if (s == "PING") {
-      notifyState();
-      statusOk();
-      return;
-    }
-
-    if (s.startsWith("LOCK:")) {
-      String pin = s.substring(5);
-      pin.trim();
-      if (!is4Digits(pin)) { statusErr("BAD_FORMAT"); return; }
-      if (safeState.hasCode() && !verifyPinNoSideEffects(pin)) { statusErr("BAD_PIN"); return; }
-      servoLock();
-      statusOk();
-      return;
-    }
-
-    if (s.startsWith("UNLOCK:")) {
-      String pin = s.substring(7);
-      pin.trim();
-      if (!is4Digits(pin)) { statusErr("BAD_FORMAT"); return; }
-      bool ok = safeState.unlock(pin);
-      if (!ok) { statusErr("BAD_PIN"); return; }
-      servoUnlock();
-      notifyState();
-      statusOk();
-      return;
-    }
-
-    if (s.startsWith("SETPIN:")) {
-      String rest = s.substring(7);
-      int idx = rest.indexOf(':');
-      if (idx < 0) { statusErr("BAD_FORMAT"); return; }
-      String a = rest.substring(0, idx);
-      String b = rest.substring(idx + 1);
-      a.trim(); b.trim();
-      if (!is4Digits(a) || !is4Digits(b)) { statusErr("BAD_FORMAT"); return; }
-      if (a != b) { statusErr("PIN_MISMATCH"); return; }
-      if (safeState.locked()) { statusErr("LOCKED"); return; }
-      safeState.setCode(a);
-      statusOk();
-      return;
-    }
-
-    statusErr("BAD_FORMAT");
-  }
-};
-
-class LcdCallbacks : public NimBLECharacteristicCallbacks {
-  void onWrite(NimBLECharacteristic* c, NimBLEConnInfo& connInfo) override {
-    std::string v = c->getValue();
-    String s(v.c_str());
-    s.trim();
-
-    if (s.startsWith("LINE1:")) { lcdSetLine(0, s.substring(6)); statusOk(); return; }
-    if (s.startsWith("LINE2:")) { lcdSetLine(1, s.substring(6)); statusOk(); return; }
-    statusErr("BAD_FORMAT");
-  }
-};
-
-static void setupBle() {
-  NimBLEDevice::init(DEVICE_NAME);
-  NimBLEDevice::setPower(ESP_PWR_LVL_P9);
-
-  NimBLEServer* serverBle = NimBLEDevice::createServer();
-  NimBLEService* svc = serverBle->createService(UUID_SVC);
-
-  NimBLECharacteristic* chCmd = svc->createCharacteristic(UUID_CMD, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR);
-  chStatus = svc->createCharacteristic(UUID_STATUS, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
-  NimBLECharacteristic* chLcd = svc->createCharacteristic(UUID_LCD, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR);
-
-  chCmd->setCallbacks(new CmdCallbacks());
-  chLcd->setCallbacks(new LcdCallbacks());
-
-  chStatus->setValue("STATE:UNKNOWN");
-
-  svc->start();
-
-  NimBLEAdvertising* adv = NimBLEDevice::getAdvertising();
-  adv->addServiceUUID(UUID_SVC);
-  adv->enableScanResponse(true);
-  adv->start();
 }
 
 // -----------------------------
@@ -620,7 +590,6 @@ static void runLockedState() {
   if (ok) {
     showUnlockedBanner();
     servoUnlock();
-    notifyState();
   } else {
     lcd.clear();
     lcdCenterPrint(0, "Access Denied!");
@@ -642,6 +611,7 @@ static void initLcdOrHalt() {
 void setup() {
   Serial.begin(115200);
   safeState.begin(64);
+  loadDeviceNameFromEeprom();
 
   initLcdOrHalt();
   init_icons(lcd);
@@ -661,13 +631,16 @@ void setup() {
   } else {
     Serial.println("HTTP server skipped because WiFi AP did not start.");
   }
-
-  setupBle();
-  notifyState();
 }
 
 void loop() {
   serviceRemoteClients();
+
+  if (restartPending && millis() >= restartAtMs) {
+    Serial.println("Restarting ESP32 now...");
+    delay(80);
+    ESP.restart();
+  }
 
   if (safeState.locked()) {
     runLockedState();

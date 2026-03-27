@@ -10,6 +10,7 @@ param(
   [string]$Port,
   [string]$Board = "esp32:esp32:esp32",
   [string]$DeviceName,
+  [string]$PartitionScheme,
   [switch]$Clean
 )
 
@@ -21,13 +22,14 @@ function Write-Usage {
 Firmware CLI wrapper for Nexgen Safe.
 
 Usage:
-  .\fw.ps1 build [wifi|ble] [-DeviceName NAME] [-Board FQBN] [-Clean]
-  .\fw.ps1 upload [wifi|ble] [-Port COM5] [-DeviceName NAME] [-Board FQBN] [-Clean]
+  .\fw.ps1 build [wifi|ble] [-DeviceName NAME] [-Board FQBN] [-PartitionScheme NAME] [-Clean]
+  .\fw.ps1 upload [wifi|ble] [-Port COM5] [-DeviceName NAME] [-Board FQBN] [-PartitionScheme NAME] [-Clean]
   .\fw.ps1 monitor [wifi|ble] [-Port COM5] [-Board FQBN]
   .\fw.ps1 list-ports
 
 Examples:
   .\fw.ps1 build
+  .\fw.ps1 build wifi -PartitionScheme huge_app
   .\fw.ps1 build ble -DeviceName NexgenSafe-02
   .\fw.ps1 upload wifi -Port COM5
   .\fw.ps1 monitor -Port COM5
@@ -60,6 +62,7 @@ function Get-TargetConfig {
         Name = "wifi"
         SketchName = "Nexgen_Safe_BLE_WIFI"
         SketchFile = "Nexgen_Safe_BLE_WIFI.ino"
+        DefaultPartitionScheme = "huge_app"
         Dependencies = @(
           "SafeState.h",
           "SafeState.cpp",
@@ -74,6 +77,7 @@ function Get-TargetConfig {
         Name = "ble"
         SketchName = "Nexgen_Safe_BLE"
         SketchFile = "Nexgen_Safe_BLE.ino"
+        DefaultPartitionScheme = "default"
         Dependencies = @(
           "SafeState.h",
           "SafeState.cpp",
@@ -86,6 +90,21 @@ function Get-TargetConfig {
       throw "Unknown target '$Name'."
     }
   }
+}
+
+function Resolve-PartitionScheme {
+  param(
+    [Parameter(Mandatory = $true)]
+    [hashtable]$Config,
+
+    [string]$RequestedPartitionScheme
+  )
+
+  if ($RequestedPartitionScheme) {
+    return $RequestedPartitionScheme
+  }
+
+  return $Config.DefaultPartitionScheme
 }
 
 function Get-SerialPorts {
@@ -212,6 +231,7 @@ switch ($Command) {
   "build" {
     $workspace = Prepare-SketchWorkspace -Config $config -NameOverride $DeviceName
     $outputDir = Join-Path $PSScriptRoot ("build\firmware\out\{0}" -f $config.Name)
+    $effectivePartitionScheme = Resolve-PartitionScheme -Config $config -RequestedPartitionScheme $PartitionScheme
 
     if ($Clean -and (Test-Path -LiteralPath $outputDir)) {
       Remove-Item -LiteralPath $outputDir -Recurse -Force
@@ -222,6 +242,7 @@ switch ($Command) {
     $arguments = @(
       "compile",
       "--fqbn", $Board,
+      "--board-options", ("PartitionScheme={0}" -f $effectivePartitionScheme),
       "--output-dir", $outputDir
     )
 
@@ -232,6 +253,7 @@ switch ($Command) {
     $arguments += $workspace
 
     Write-Host ("Building {0} firmware for {1}" -f $config.Name, $Board)
+    Write-Host ("Using partition scheme: {0}" -f $effectivePartitionScheme)
     if ($DeviceName) {
       Write-Host ("Using DEVICE_NAME override: {0}" -f $DeviceName)
     }
@@ -244,6 +266,7 @@ switch ($Command) {
     $resolvedPort = Resolve-Port -RequestedPort $Port
     $workspace = Prepare-SketchWorkspace -Config $config -NameOverride $DeviceName
     $outputDir = Join-Path $PSScriptRoot ("build\firmware\out\{0}" -f $config.Name)
+    $effectivePartitionScheme = Resolve-PartitionScheme -Config $config -RequestedPartitionScheme $PartitionScheme
 
     if ($Clean -and (Test-Path -LiteralPath $outputDir)) {
       Remove-Item -LiteralPath $outputDir -Recurse -Force
@@ -254,6 +277,7 @@ switch ($Command) {
     $arguments = @(
       "compile",
       "--fqbn", $Board,
+      "--board-options", ("PartitionScheme={0}" -f $effectivePartitionScheme),
       "--output-dir", $outputDir,
       "--upload",
       "--port", $resolvedPort
@@ -266,6 +290,7 @@ switch ($Command) {
     $arguments += $workspace
 
     Write-Host ("Uploading {0} firmware to {1} using {2}" -f $config.Name, $resolvedPort, $Board)
+    Write-Host ("Using partition scheme: {0}" -f $effectivePartitionScheme)
     if ($DeviceName) {
       Write-Host ("Using DEVICE_NAME override: {0}" -f $DeviceName)
     }

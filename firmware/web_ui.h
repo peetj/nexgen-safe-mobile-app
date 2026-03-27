@@ -18,6 +18,8 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       --red:#fb7185;
       --amber:#fbbf24;
       --cyan:#5eead4;
+      --glow-hot:rgba(255,94,25,.22);
+      --glow-cool:rgba(94,234,212,.14);
     }
     *{box-sizing:border-box}
     body{
@@ -28,9 +30,39 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       font-family:"Segoe UI",Tahoma,Geneva,Verdana,sans-serif;
       color:var(--offwhite);
       background:
-        radial-gradient(circle at top left, rgba(255,94,25,.22), transparent 30%),
-        radial-gradient(circle at top right, rgba(94,234,212,.14), transparent 28%),
+        radial-gradient(circle at top left, var(--glow-hot), transparent 30%),
+        radial-gradient(circle at top right, var(--glow-cool), transparent 28%),
         linear-gradient(180deg, #15181e 0%, #0b0d12 100%);
+    }
+    body[data-theme="coast"]{
+      --orange:#2dd4bf;
+      --orange-soft:#67e8f9;
+      --green:#22c55e;
+      --red:#f97316;
+      --amber:#facc15;
+      --cyan:#38bdf8;
+      --glow-hot:rgba(45,212,191,.22);
+      --glow-cool:rgba(56,189,248,.16);
+    }
+    body[data-theme="vault"]{
+      --orange:#f59e0b;
+      --orange-soft:#fde047;
+      --green:#84cc16;
+      --red:#ef4444;
+      --amber:#f59e0b;
+      --cyan:#d4d4d8;
+      --glow-hot:rgba(245,158,11,.22);
+      --glow-cool:rgba(212,212,216,.14);
+    }
+    body[data-theme="midnight"]{
+      --orange:#60a5fa;
+      --orange-soft:#a78bfa;
+      --green:#22d3ee;
+      --red:#f472b6;
+      --amber:#c084fc;
+      --cyan:#38bdf8;
+      --glow-hot:rgba(96,165,250,.2);
+      --glow-cool:rgba(167,139,250,.16);
     }
     header{
       padding:22px 18px 14px;
@@ -314,6 +346,16 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       font-size:15px;
       margin-bottom:10px;
     }
+    select{
+      width:100%;
+      padding:14px;
+      border-radius:14px;
+      border:1px solid rgba(242,242,240,.14);
+      background:rgba(0,0,0,.22);
+      color:var(--offwhite);
+      font-size:15px;
+      margin-bottom:10px;
+    }
     input[readonly]{
       color:rgba(242,242,240,.78);
     }
@@ -374,10 +416,19 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       <div class="modal-head">
         <div>
           <div class="modal-title">Settings</div>
-          <div class="hint">Use the local hostname first. If that does not work on a phone, fall back to the IP.</div>
+          <div class="hint">Themes are local to this browser. Renaming the safe needs a restart before the new Wi-Fi name and hostname become active.</div>
         </div>
         <button id="settingsCloseBtn" class="ghost small">Close</button>
       </div>
+      <div class="settings-label">Theme</div>
+      <select id="themeSelect">
+        <option value="ember">Nexgen Ember</option>
+        <option value="coast">Coast Mint</option>
+        <option value="vault">Vault Gold</option>
+        <option value="midnight">Midnight Signal</option>
+      </select>
+      <div class="settings-label">Safe name</div>
+      <input id="safeName" maxlength="31" placeholder="NexgenSafe-01" value="NexgenSafe-01">
       <div class="settings-label">Local hostname</div>
       <input id="localUrl" readonly value="http://nexgensafe-01.local">
       <div class="settings-label">Fallback IP</div>
@@ -386,6 +437,10 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       <input id="l1" placeholder="Line 1" value="Nexgen Safe">
       <div class="settings-label">LCD line 2</div>
       <input id="l2" placeholder="Line 2" value="Use the browser">
+      <div class="footer-row">
+        <button id="renameBtn" class="tonal">Save Name</button>
+        <button id="restartBtn" class="ghost">Restart ESP32</button>
+      </div>
       <div class="row">
         <button id="settingsCancelBtn" class="ghost" style="flex:1">Cancel</button>
         <button id="lcdBtn" class="primary" style="flex:1">Save to LCD</button>
@@ -404,14 +459,19 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
     const dotsEl = document.getElementById('dots');
     const gridEl = document.getElementById('grid');
     const settingsModalEl = document.getElementById('settingsModal');
+    const themeSelectEl = document.getElementById('themeSelect');
+    const safeNameEl = document.getElementById('safeName');
     const localUrlEl = document.getElementById('localUrl');
     const ipUrlEl = document.getElementById('ipUrl');
+    const THEME_STORAGE_KEY = 'nexgen-safe-theme';
 
     let action = 'none';
     let pin = '';
     let pin1 = '';
     let lastLockedState = null;
     let audioCtx = null;
+    let desiredSafeName = '';
+    let desiredSafeUrl = '';
 
     function getAudioContext() {
       const AudioCtor = window.AudioContext || window.webkitAudioContext;
@@ -467,8 +527,32 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       msgEl.textContent = text || '';
     }
 
-    function syncAccessUrls(url) {
-      localUrlEl.value = url || fallbackUrl;
+    function applyTheme(theme, persist = true) {
+      const allowed = ['ember', 'coast', 'vault', 'midnight'];
+      const nextTheme = allowed.includes(theme) ? theme : 'ember';
+      document.body.dataset.theme = nextTheme;
+      themeSelectEl.value = nextTheme;
+      if (persist) {
+        localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+      }
+    }
+
+    function loadTheme() {
+      try {
+        applyTheme(localStorage.getItem(THEME_STORAGE_KEY) || 'ember', false);
+      } catch (_) {
+        applyTheme('ember', false);
+      }
+    }
+
+    function syncAccessUrls(url, name) {
+      const effectiveName = desiredSafeName || name || 'Nexgen Safe';
+      const effectiveUrl = desiredSafeUrl || url || fallbackUrl;
+
+      if (document.activeElement !== safeNameEl) {
+        safeNameEl.value = effectiveName;
+      }
+      localUrlEl.value = effectiveUrl;
       ipUrlEl.value = fallbackUrl;
     }
 
@@ -520,8 +604,13 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
     async function refreshStatus() {
       try {
         const json = await api('/status');
-        nameEl.textContent = json.name || 'Nexgen Safe';
-        syncAccessUrls(json.url);
+        const safeName = json.name || 'Nexgen Safe';
+        if (desiredSafeName && safeName === desiredSafeName) {
+          desiredSafeName = '';
+          desiredSafeUrl = '';
+        }
+        nameEl.textContent = safeName;
+        syncAccessUrls(json.url, safeName);
 
         if (json.locked === true) {
           applyStatus('Locked', 'locked');
@@ -538,7 +627,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       } catch (_) {
         applyStatus('Offline', 'offline');
         nameEl.textContent = 'Nexgen Safe';
-        syncAccessUrls('');
+        syncAccessUrls('', 'Nexgen Safe');
         lastLockedState = null;
       }
     }
@@ -632,6 +721,39 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       }
     }
 
+    async function renameSafe() {
+      const requestedName = safeNameEl.value.trim();
+      if (!requestedName) {
+        playError();
+        setMessage('Enter a safe name first');
+        return;
+      }
+
+      try {
+        const json = await api('/rename', { name: requestedName });
+        playSuccess();
+        desiredSafeName = json.name || requestedName;
+        desiredSafeUrl = json.url || fallbackUrl;
+        syncAccessUrls(json.url, json.name);
+        setMessage((json.restart_required ? 'Name saved. Tap Restart ESP32 to apply ' : 'Safe name updated to ') + (json.name || requestedName));
+      } catch (err) {
+        playError();
+        setMessage(String(err.message || err));
+      }
+    }
+
+    async function restartSafe() {
+      try {
+        await api('/restart', {});
+        playSuccess();
+        closeSettings();
+        setMessage('ESP32 restarting. Reconnect to ' + (desiredSafeName || safeNameEl.value.trim() || nameEl.textContent) + ' and open ' + (desiredSafeUrl || localUrlEl.value || fallbackUrl));
+      } catch (err) {
+        playError();
+        setMessage(String(err.message || err));
+      }
+    }
+
     document.getElementById('lockBtn').onclick = () => {
       playTap();
       action = 'lock';
@@ -681,6 +803,21 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       closeSettings();
     };
 
+    themeSelectEl.onchange = () => {
+      playTap();
+      applyTheme(themeSelectEl.value);
+    };
+
+    document.getElementById('renameBtn').onclick = () => {
+      playTap();
+      renameSafe();
+    };
+
+    document.getElementById('restartBtn').onclick = () => {
+      playTap();
+      restartSafe();
+    };
+
     document.getElementById('lcdBtn').onclick = () => {
       playTap();
       saveLcd();
@@ -694,12 +831,14 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
 
     buildKeypad();
     resetFlow();
-    syncAccessUrls('');
+    loadTheme();
+    syncAccessUrls('', 'Nexgen Safe');
     refreshStatus();
     setInterval(refreshStatus, 2000);
   </script>
 </body>
 </html>
+
 )rawliteral";
 
 #endif
