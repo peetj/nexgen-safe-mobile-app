@@ -30,6 +30,25 @@ Brand assets are stored in:
 - `docs/ble-protocol.md` (draft GATT + payload spec)
 - `docs/README.md` (ESP32 Wi-Fi AP mode)
 
+## Firmware CLI
+- Use the wrapper from the repo root:
+  - `.\fw.ps1 build`
+  - `.\fw.ps1 build ble`
+  - `.\fw.ps1 upload wifi -Port COM5`
+  - `.\fw.ps1 monitor -Port COM5`
+  - `.\fw.ps1 list-ports`
+- Bash wrapper for Git Bash / WSL-on-Windows:
+  - `bash ./fw.sh build`
+  - `bash ./fw.sh build ble -DeviceName NexgenSafe-02`
+  - `bash ./fw.sh upload wifi -Port COM5`
+  - `bash ./fw.sh list-ports`
+- Defaults:
+  - target = `wifi`
+  - board = `esp32:esp32:esp32`
+- Optional device name override at build/upload time:
+  - `.\fw.ps1 build wifi -DeviceName NexgenSafe-02`
+- Build artifacts and temporary sketch folders are written under `build/firmware/`.
+
 ## Notes
 - Physical keypad + LCD remain first-class.
 - Wi-Fi AP mode is the preferred path for school deployment.
