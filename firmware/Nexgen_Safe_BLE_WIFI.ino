@@ -105,6 +105,11 @@ SafeState safeState;
 // -----------------------------
 WebServer server(80);
 
+static inline void serviceRemoteClients() {
+  server.handleClient();
+  delay(2);
+}
+
 static inline void lcdCenterPrint(uint8_t row, const char* text) {
   size_t len = strlen(text);
   uint8_t col = (len >= LCD_COLS) ? 0 : (LCD_COLS - len) / 2;
@@ -261,17 +266,53 @@ static void setupHttp() {
   server.on("/lcd", HTTP_OPTIONS, []() { httpJson(204, "{}"); });
 
   server.begin();
+  Serial.println("HTTP server ready at http://192.168.4.1");
 }
 
-static void setupWifiAp() {
-  WiFi.mode(WIFI_AP);
-  WiFi.softAP(DEVICE_NAME); // open network
+static bool setupWifiAp() {
+  const IPAddress apIp(192, 168, 4, 1);
+  const IPAddress apGateway(192, 168, 4, 1);
+  const IPAddress apSubnet(255, 255, 255, 0);
 
-  // Minimal LCD info
+  Serial.println();
+  Serial.println("== WiFi AP setup ==");
+  Serial.print("Requested SSID: ");
+  Serial.println(DEVICE_NAME);
+
+  WiFi.persistent(false);
+  WiFi.disconnect(true, true);
+  delay(100);
+
+  bool modeOk = WiFi.mode(WIFI_MODE_AP);
+  bool configOk = WiFi.softAPConfig(apIp, apGateway, apSubnet);
+  bool apOk = WiFi.softAP(DEVICE_NAME); // open network
+  delay(250);
+
+  IPAddress currentIp = WiFi.softAPIP();
+
+  Serial.print("WiFi.mode(AP): ");
+  Serial.println(modeOk ? "OK" : "FAIL");
+  Serial.print("WiFi.softAPConfig: ");
+  Serial.println(configOk ? "OK" : "FAIL");
+  Serial.print("WiFi.softAP: ");
+  Serial.println(apOk ? "OK" : "FAIL");
+  Serial.print("Active SSID: ");
+  Serial.println(WiFi.softAPSSID());
+  Serial.print("AP IP: ");
+  Serial.println(currentIp);
+
   lcd.clear();
-  lcdSetLine(0, "WiFi: " + String(DEVICE_NAME));
-  lcdSetLine(1, "IP: 192.168.4.1");
-  delay(1200);
+  if (apOk) {
+    lcdSetLine(0, "WiFi: " + String(DEVICE_NAME));
+    lcdSetLine(1, "IP: " + currentIp.toString());
+    delay(1500);
+  } else {
+    lcdSetLine(0, "WiFi AP failed");
+    lcdSetLine(1, "Check serial log");
+    delay(2500);
+  }
+
+  return apOk;
 }
 
 // -----------------------------
@@ -378,6 +419,7 @@ static String readNumericCodeMasked(uint8_t length) {
   code.reserve(length);
 
   while (code.length() < length) {
+    serviceRemoteClients();
     char k = keypad.getKey();
     if (k >= '0' && k <= '9') {
       lcd.print('*');
@@ -414,6 +456,7 @@ static bool promptSetNewCode() {
 static char waitForKey(char a, char b) {
   char k = keypad.getKey();
   while (k != a && k != b) {
+    serviceRemoteClients();
     k = keypad.getKey();
   }
   return k;
@@ -424,7 +467,11 @@ static void showProgressBar(uint16_t stepDelayMs) {
   lcd.print("[..........]");
   lcd.setCursor(3, 1);
   for (uint8_t i = 0; i < 10; i++) {
-    delay(stepDelayMs);
+    uint16_t waited = 0;
+    while (waited < stepDelayMs) {
+      serviceRemoteClients();
+      waited += 2;
+    }
     lcd.print('=');
   }
 }
@@ -532,15 +579,19 @@ void setup() {
     servoUnlock();
   }
 
-  setupWifiAp();
-  setupHttp();
+  bool wifiReady = setupWifiAp();
+  if (wifiReady) {
+    setupHttp();
+  } else {
+    Serial.println("HTTP server skipped because WiFi AP did not start.");
+  }
 
   setupBle();
   notifyState();
 }
 
 void loop() {
-  server.handleClient();
+  serviceRemoteClients();
 
   if (safeState.locked()) {
     runLockedState();

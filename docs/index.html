@@ -29,6 +29,8 @@
     .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
     .key{background:rgba(242,242,240,.06);border:1px solid rgba(242,242,240,.1);color:var(--offwhite);font-size:20px}
     input{width:100%;padding:12px;border-radius:12px;border:1px solid rgba(242,242,240,.14);background:rgba(0,0,0,.2);color:var(--offwhite)}
+    .steps{margin:0;padding-left:18px;color:rgba(242,242,240,.86);font-size:14px;line-height:1.5}
+    .steps li+li{margin-top:6px}
   </style>
 </head>
 <body>
@@ -42,6 +44,17 @@
       </div>
       <p class="hint" style="margin:10px 0 0">Join the safe Wi-Fi hotspot, then use this page in your browser.</p>
       <p id="msg" class="hint msg"></p>
+    </div>
+
+    <div class="card">
+      <div class="hint" style="margin-bottom:8px">Phone setup</div>
+      <ol class="steps">
+        <li>Open your phone Wi-Fi settings and join the safe network shown as <b>NexgenSafe-XX</b>.</li>
+        <li>If your phone says the network has no internet, stay connected.</li>
+        <li>If this page does not open automatically, open Safari or Chrome and go to <b>http://192.168.4.1</b>.</li>
+        <li>Tap <b>Unlock</b> or <b>Lock</b>, enter the 4-digit PIN, then tap <b>Go</b>.</li>
+        <li>Use <b>Set PIN</b> to change the safe code.</li>
+      </ol>
     </div>
 
     <div class="card">
