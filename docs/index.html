@@ -373,6 +373,11 @@
       padding-top:14px;
       border-top:1px solid var(--line-soft);
     }
+    .settings-block.first{
+      margin-top:0;
+      padding-top:0;
+      border-top:0;
+    }
     .theme-grid{
       display:grid;
       grid-template-columns:repeat(2, minmax(0, 1fr));
@@ -408,18 +413,26 @@
       border:0;
       border-radius:8px;
     }
-    .theme-tools{
-      margin-top:8px;
-    }
     .mini-hint{
       margin:-2px 0 8px;
       font-size:11px;
       line-height:1.5;
       color:var(--text-subtle);
     }
-    .theme-delete{
-      border-color:var(--status-locked-badge-border);
-      color:var(--red);
+    .inline-status{
+      margin:-2px 0 0;
+      font-size:11px;
+      line-height:1.5;
+      color:var(--text-subtle);
+    }
+    .modal-card.compact{
+      width:min(100%, 420px);
+    }
+    .restart-copy{
+      margin:2px 0 8px;
+      font-size:14px;
+      line-height:1.6;
+      color:var(--text-mid);
     }
     input[readonly]{
       color:var(--text-mid);
@@ -482,95 +495,120 @@
       <div class="modal-head">
         <div>
           <div class="modal-title">Settings</div>
-          <div class="hint">Themes are local to this browser. Renaming the safe needs a restart before the new Wi-Fi name and hostname become active.</div>
+          <div class="hint">Theme changes apply instantly. Safe name and LCD changes save automatically.</div>
         </div>
         <button id="settingsCloseBtn" class="ghost small">Close</button>
       </div>
-      <div class="settings-label">Theme</div>
-      <select id="themeSelect"></select>
-      <div class="mini-hint">Choose a built-in theme or one of your saved custom themes.</div>
-      <div class="settings-label">Custom theme name</div>
-      <input id="customThemeName" maxlength="24" placeholder="My Safe Theme" value="">
-      <div class="theme-tools footer-row">
-        <button id="saveThemeBtn" class="tonal">Save Theme</button>
-        <button id="deleteThemeBtn" class="ghost theme-delete">Delete Theme</button>
-      </div>
-      <div class="mini-hint">Change the colors below, then save them as a named custom theme for this phone or browser.</div>
-      <div class="theme-grid">
-        <div class="theme-color">
-          <label for="colorBgTop">Page Top</label>
-          <input id="colorBgTop" type="color" value="#15181e">
-        </div>
-        <div class="theme-color">
-          <label for="colorBgBottom">Page Bottom</label>
-          <input id="colorBgBottom" type="color" value="#0b0d12">
-        </div>
-        <div class="theme-color">
-          <label for="colorPanelTop">Panel Top</label>
-          <input id="colorPanelTop" type="color" value="#22262e">
-        </div>
-        <div class="theme-color">
-          <label for="colorPanelBottom">Panel Bottom</label>
-          <input id="colorPanelBottom" type="color" value="#14181d">
-        </div>
-        <div class="theme-color">
-          <label for="colorModalTop">Settings Top</label>
-          <input id="colorModalTop" type="color" value="#1b1f27">
-        </div>
-        <div class="theme-color">
-          <label for="colorModalBottom">Settings Bottom</label>
-          <input id="colorModalBottom" type="color" value="#11141a">
-        </div>
-        <div class="theme-color">
-          <label for="colorOrange">Primary</label>
-          <input id="colorOrange" type="color" value="#ff5e19">
-        </div>
-        <div class="theme-color">
-          <label for="colorOrangeSoft">Secondary</label>
-          <input id="colorOrangeSoft" type="color" value="#ff8a47">
-        </div>
-        <div class="theme-color">
-          <label for="colorCyan">Accent</label>
-          <input id="colorCyan" type="color" value="#5eead4">
-        </div>
-        <div class="theme-color">
-          <label for="colorOffwhite">Text</label>
-          <input id="colorOffwhite" type="color" value="#f2f2f0">
-        </div>
-        <div class="theme-color">
-          <label for="colorGreen">Success</label>
-          <input id="colorGreen" type="color" value="#34d399">
-        </div>
-        <div class="theme-color">
-          <label for="colorRed">Danger</label>
-          <input id="colorRed" type="color" value="#fb7185">
-        </div>
-        <div class="theme-color">
-          <label for="colorAmber">Warning</label>
-          <input id="colorAmber" type="color" value="#fbbf24">
-        </div>
+      <div class="settings-block first">
+        <div class="settings-label">Theme</div>
+        <select id="themeSelect"></select>
+        <div id="themeSummary" class="mini-hint">Choose a preset instantly, or open Custom Theme to edit colors.</div>
       </div>
       <div class="settings-block">
-      <div class="settings-label">Safe name</div>
-      <input id="safeName" maxlength="31" placeholder="NexgenSafe-01" value="NexgenSafe-01">
-      <div class="settings-label">Local hostname</div>
-      <input id="localUrl" readonly value="http://nexgensafe-01.local">
-      <div class="settings-label">Fallback IP</div>
-      <input id="ipUrl" readonly value="http://192.168.4.1">
+        <div class="settings-label">Safe name</div>
+        <input id="safeName" maxlength="31" placeholder="NexgenSafe-01" value="NexgenSafe-01">
+        <div id="safeNameStatus" class="mini-hint">Changes save automatically when you leave this field.</div>
+        <div class="settings-label">Local hostname</div>
+        <input id="localUrl" readonly value="http://nexgensafe-01.local">
+        <div class="settings-label">Fallback IP</div>
+        <input id="ipUrl" readonly value="http://192.168.4.1">
       </div>
       <div class="settings-block">
-      <div class="settings-label">LCD line 1</div>
-      <input id="l1" placeholder="Line 1" value="Nexgen Safe">
-      <div class="settings-label">LCD line 2</div>
-      <input id="l2" placeholder="Line 2" value="Use the browser">
+        <div class="settings-label">LCD line 1</div>
+        <input id="l1" placeholder="Line 1" value="Nexgen Safe">
+        <div class="settings-label">LCD line 2</div>
+        <input id="l2" placeholder="Line 2" value="Use the browser">
+        <div id="lcdStatus" class="mini-hint">LCD changes save automatically.</div>
       </div>
+    </div>
+  </div>
+
+  <div id="customThemeModal" class="modal" hidden>
+    <div class="modal-card">
+      <div class="modal-head">
+        <div>
+          <div class="modal-title">Custom Theme</div>
+          <div class="hint">Color changes save automatically on this phone or browser.</div>
+        </div>
+        <button id="themeBackBtn" class="ghost small">Back</button>
+      </div>
+      <div class="settings-block first">
+        <div class="settings-label">Theme name</div>
+        <input id="customThemeName" maxlength="24" placeholder="My Safe Theme" value="">
+        <div class="mini-hint">This name is just for the browser theme. It does not rename the safe itself.</div>
+      </div>
+      <div class="settings-block">
+        <div class="settings-label">Colors</div>
+        <div class="theme-grid">
+          <div class="theme-color">
+            <label for="colorBgTop">Page Top</label>
+            <input id="colorBgTop" type="color" value="#15181e">
+          </div>
+          <div class="theme-color">
+            <label for="colorBgBottom">Page Bottom</label>
+            <input id="colorBgBottom" type="color" value="#0b0d12">
+          </div>
+          <div class="theme-color">
+            <label for="colorPanelTop">Panel Top</label>
+            <input id="colorPanelTop" type="color" value="#22262e">
+          </div>
+          <div class="theme-color">
+            <label for="colorPanelBottom">Panel Bottom</label>
+            <input id="colorPanelBottom" type="color" value="#14181d">
+          </div>
+          <div class="theme-color">
+            <label for="colorModalTop">Settings Top</label>
+            <input id="colorModalTop" type="color" value="#1b1f27">
+          </div>
+          <div class="theme-color">
+            <label for="colorModalBottom">Settings Bottom</label>
+            <input id="colorModalBottom" type="color" value="#11141a">
+          </div>
+          <div class="theme-color">
+            <label for="colorOrange">Primary</label>
+            <input id="colorOrange" type="color" value="#ff5e19">
+          </div>
+          <div class="theme-color">
+            <label for="colorOrangeSoft">Secondary</label>
+            <input id="colorOrangeSoft" type="color" value="#ff8a47">
+          </div>
+          <div class="theme-color">
+            <label for="colorCyan">Accent</label>
+            <input id="colorCyan" type="color" value="#5eead4">
+          </div>
+          <div class="theme-color">
+            <label for="colorOffwhite">Text</label>
+            <input id="colorOffwhite" type="color" value="#f2f2f0">
+          </div>
+          <div class="theme-color">
+            <label for="colorGreen">Success</label>
+            <input id="colorGreen" type="color" value="#34d399">
+          </div>
+          <div class="theme-color">
+            <label for="colorRed">Danger</label>
+            <input id="colorRed" type="color" value="#fb7185">
+          </div>
+          <div class="theme-color">
+            <label for="colorAmber">Warning</label>
+            <input id="colorAmber" type="color" value="#fbbf24">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="restartModal" class="modal" hidden>
+    <div class="modal-card compact">
+      <div class="modal-head">
+        <div>
+          <div class="modal-title">Restart Required</div>
+          <div class="hint">The safe name changed. Restart the ESP32 to apply the new Wi-Fi and local hostname.</div>
+        </div>
+      </div>
+      <p id="restartText" class="restart-copy"></p>
       <div class="footer-row">
-        <button id="renameBtn" class="tonal">Save Name</button>
-        <button id="restartBtn" class="ghost">Restart ESP32</button>
-      </div>
-      <div class="row">
-        <button id="settingsCancelBtn" class="ghost" style="flex:1">Cancel</button>
-        <button id="lcdBtn" class="primary" style="flex:1">Save to LCD</button>
+        <button id="restartLaterBtn" class="ghost">Later</button>
+        <button id="restartNowBtn" class="primary">Restart Now</button>
       </div>
     </div>
   </div>
@@ -586,13 +624,23 @@
     const dotsEl = document.getElementById('dots');
     const gridEl = document.getElementById('grid');
     const settingsModalEl = document.getElementById('settingsModal');
+    const customThemeModalEl = document.getElementById('customThemeModal');
+    const restartModalEl = document.getElementById('restartModal');
+    const restartTextEl = document.getElementById('restartText');
     const themeSelectEl = document.getElementById('themeSelect');
+    const themeSummaryEl = document.getElementById('themeSummary');
     const customThemeNameEl = document.getElementById('customThemeName');
     const safeNameEl = document.getElementById('safeName');
+    const safeNameStatusEl = document.getElementById('safeNameStatus');
     const localUrlEl = document.getElementById('localUrl');
     const ipUrlEl = document.getElementById('ipUrl');
+    const l1El = document.getElementById('l1');
+    const l2El = document.getElementById('l2');
+    const lcdStatusEl = document.getElementById('lcdStatus');
     const ACTIVE_THEME_STORAGE_KEY = 'nexgen-safe-theme';
-    const CUSTOM_THEMES_STORAGE_KEY = 'nexgen-safe-custom-themes';
+    const CUSTOM_THEME_STORAGE_KEY = 'nexgen-safe-custom-theme';
+    const CUSTOM_THEME_ID = 'custom';
+    const DEFAULT_CUSTOM_THEME_NAME = 'My Safe Theme';
     const THEME_FIELDS = [
       { key: 'bgTop', inputId: 'colorBgTop' },
       { key: 'bgBottom', inputId: 'colorBgBottom' },
@@ -691,8 +739,13 @@
     let audioCtx = null;
     let desiredSafeName = '';
     let desiredSafeUrl = '';
-    let customThemes = {};
-    let activeThemeId = 'preset:ember';
+    let customTheme = null;
+    let activeThemeId = 'ember';
+    let safeNameDirty = false;
+    let lastSavedSafeName = safeNameEl.value.trim();
+    let lcdDirty = false;
+    let lcdSaveTimer = null;
+    let lastSavedLcd = { line1: l1El.value, line2: l2El.value };
 
     function getAudioContext() {
       const AudioCtor = window.AudioContext || window.webkitAudioContext;
@@ -861,186 +914,257 @@
     }
 
     function normalizeStoredThemeId(rawValue) {
-      if (!rawValue) return 'preset:ember';
-      if (rawValue.startsWith('preset:') || rawValue.startsWith('custom:')) return rawValue;
-      if (PRESET_THEMES[rawValue]) return 'preset:' + rawValue;
-      return 'preset:ember';
+      if (rawValue === CUSTOM_THEME_ID) return CUSTOM_THEME_ID;
+      return PRESET_THEMES[rawValue] ? rawValue : 'ember';
     }
 
-    function slugifyThemeName(name) {
-      const slug = String(name || '')
-        .trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '')
-        .slice(0, 24);
-      return slug || 'theme';
-    }
-
-    function buildUniqueCustomThemeId(name, ignoreId = '') {
-      const base = slugifyThemeName(name);
-      let candidate = base;
-      let counter = 2;
-      while (customThemes[candidate] && candidate !== ignoreId) {
-        candidate = base + '-' + counter;
-        counter += 1;
-      }
-      return candidate;
-    }
-
-    function loadCustomThemes() {
-      customThemes = {};
+    function loadCustomTheme() {
       try {
-        const parsed = JSON.parse(localStorage.getItem(CUSTOM_THEMES_STORAGE_KEY) || '{}');
-        Object.keys(parsed || {}).forEach((id) => {
-          const item = parsed[id];
-          if (!item || typeof item.name !== 'string') return;
-          const trimmedName = item.name.trim().slice(0, 24);
-          if (!trimmedName) return;
-          customThemes[id] = {
-            name: trimmedName,
-            values: normalizeThemeValues(item.values)
-          };
-        });
+        const parsed = JSON.parse(localStorage.getItem(CUSTOM_THEME_STORAGE_KEY) || 'null');
+        if (!parsed || typeof parsed !== 'object') return null;
+        return {
+          name: (parsed.name || DEFAULT_CUSTOM_THEME_NAME).toString().trim().slice(0, 24) || DEFAULT_CUSTOM_THEME_NAME,
+          values: normalizeThemeValues(parsed.values)
+        };
       } catch (_) {
-        customThemes = {};
+        return null;
       }
     }
 
-    function persistCustomThemes() {
-      localStorage.setItem(CUSTOM_THEMES_STORAGE_KEY, JSON.stringify(customThemes));
+    function persistCustomTheme() {
+      if (!customTheme) return;
+      localStorage.setItem(CUSTOM_THEME_STORAGE_KEY, JSON.stringify(customTheme));
+    }
+
+    function ensureCustomTheme(seedValues) {
+      if (!customTheme) {
+        customTheme = {
+          name: DEFAULT_CUSTOM_THEME_NAME,
+          values: normalizeThemeValues(seedValues || PRESET_THEMES.ember.values)
+        };
+        persistCustomTheme();
+      }
+      return customTheme;
+    }
+
+    function getCurrentThemeValues() {
+      if (activeThemeId === CUSTOM_THEME_ID) {
+        return ensureCustomTheme().values;
+      }
+      return PRESET_THEMES[activeThemeId].values;
     }
 
     function renderThemeOptions(selectedId = activeThemeId) {
       themeSelectEl.innerHTML = '';
-
-      const presetGroup = document.createElement('optgroup');
-      presetGroup.label = 'Built-in';
       Object.entries(PRESET_THEMES).forEach(([id, theme]) => {
         const option = document.createElement('option');
-        option.value = 'preset:' + id;
+        option.value = id;
         option.textContent = theme.label;
-        presetGroup.appendChild(option);
+        themeSelectEl.appendChild(option);
       });
-      themeSelectEl.appendChild(presetGroup);
 
-      const customIds = Object.keys(customThemes).sort((a, b) => customThemes[a].name.localeCompare(customThemes[b].name));
-      if (customIds.length) {
-        const customGroup = document.createElement('optgroup');
-        customGroup.label = 'Custom';
-        customIds.forEach((id) => {
-          const option = document.createElement('option');
-          option.value = 'custom:' + id;
-          option.textContent = customThemes[id].name;
-          customGroup.appendChild(option);
-        });
-        themeSelectEl.appendChild(customGroup);
-      }
-
-      themeSelectEl.value = themeSelectEl.querySelector('option[value="' + selectedId + '"]') ? selectedId : 'preset:ember';
+      const customOption = document.createElement('option');
+      customOption.value = CUSTOM_THEME_ID;
+      customOption.textContent = 'Custom Theme';
+      themeSelectEl.appendChild(customOption);
+      themeSelectEl.value = normalizeStoredThemeId(selectedId);
     }
 
-    function getThemeRecord(themeId) {
-      const normalizedId = normalizeStoredThemeId(themeId);
-      if (normalizedId.startsWith('custom:')) {
-        const customId = normalizedId.slice(7);
-        const customTheme = customThemes[customId];
-        if (customTheme) {
-          return {
-            id: normalizedId,
-            kind: 'custom',
-            key: customId,
-            label: customTheme.name,
-            values: cloneThemeValues(customTheme.values)
-          };
-        }
+    function updateThemeSummary() {
+      const customLabel = customTheme && customTheme.name ? customTheme.name : DEFAULT_CUSTOM_THEME_NAME;
+      if (activeThemeId === CUSTOM_THEME_ID) {
+        themeSummaryEl.textContent = 'Current custom theme: ' + customLabel + '. Choose Custom Theme again to edit colors.';
+      } else {
+        themeSummaryEl.textContent = 'Preset theme active. Choose Custom Theme to open the color editor.';
       }
-
-      const presetKey = normalizedId.replace(/^preset:/, '');
-      const preset = PRESET_THEMES[presetKey] || PRESET_THEMES.ember;
-      const resolvedKey = PRESET_THEMES[presetKey] ? presetKey : 'ember';
-      return {
-        id: 'preset:' + resolvedKey,
-        kind: 'preset',
-        key: resolvedKey,
-        label: preset.label,
-        values: cloneThemeValues(preset.values)
-      };
     }
 
     function applyTheme(themeId, persist = true) {
-      const record = getThemeRecord(themeId);
-      activeThemeId = record.id;
-      renderThemeOptions(record.id);
-      themeSelectEl.value = record.id;
-      setThemeEditorValues(record.values);
-      customThemeNameEl.value = record.kind === 'custom' ? record.label : '';
-      document.getElementById('deleteThemeBtn').disabled = record.kind !== 'custom';
-      document.body.dataset.theme = record.id.replace(':', '-');
-      applyThemeValues(record.values);
+      const nextThemeId = normalizeStoredThemeId(themeId);
+      if (nextThemeId === CUSTOM_THEME_ID) {
+        const theme = ensureCustomTheme(getCurrentThemeValues());
+        customThemeNameEl.value = theme.name;
+        setThemeEditorValues(theme.values);
+        applyThemeValues(theme.values);
+      } else {
+        applyThemeValues(PRESET_THEMES[nextThemeId].values);
+        if (customTheme) {
+          customThemeNameEl.value = customTheme.name;
+          setThemeEditorValues(customTheme.values);
+        }
+      }
+
+      activeThemeId = nextThemeId;
+      document.body.dataset.theme = nextThemeId;
+      renderThemeOptions(nextThemeId);
+      updateThemeSummary();
       if (persist) {
-        localStorage.setItem(ACTIVE_THEME_STORAGE_KEY, record.id);
+        localStorage.setItem(ACTIVE_THEME_STORAGE_KEY, nextThemeId);
       }
     }
 
     function loadTheme() {
-      loadCustomThemes();
-      renderThemeOptions('preset:ember');
-      try {
-        applyTheme(normalizeStoredThemeId(localStorage.getItem(ACTIVE_THEME_STORAGE_KEY)), false);
-      } catch (_) {
-        applyTheme('preset:ember', false);
+      customTheme = loadCustomTheme();
+      const storedTheme = normalizeStoredThemeId(localStorage.getItem(ACTIVE_THEME_STORAGE_KEY) || 'ember');
+      if (storedTheme === CUSTOM_THEME_ID) {
+        ensureCustomTheme(PRESET_THEMES.ember.values);
       }
+      applyTheme(storedTheme, false);
     }
 
-    function previewThemeFromInputs() {
-      applyThemeValues(getThemeEditorValues());
-    }
-
-    async function saveCustomTheme() {
+    function saveCustomThemeEdits() {
+      const theme = ensureCustomTheme(getCurrentThemeValues());
       const requestedName = customThemeNameEl.value.trim().slice(0, 24);
+      theme.name = requestedName || DEFAULT_CUSTOM_THEME_NAME;
+      theme.values = normalizeThemeValues(getThemeEditorValues());
+      customTheme = theme;
+      activeThemeId = CUSTOM_THEME_ID;
+      persistCustomTheme();
+      applyThemeValues(theme.values);
+      renderThemeOptions(CUSTOM_THEME_ID);
+      updateThemeSummary();
+      localStorage.setItem(ACTIVE_THEME_STORAGE_KEY, CUSTOM_THEME_ID);
+    }
+
+    function openSettings() {
+      settingsModalEl.hidden = false;
+      safeNameStatusEl.textContent = desiredSafeName
+        ? 'Saved. Restart required to apply the new Wi-Fi name.'
+        : 'Changes save automatically when you leave this field.';
+      lcdStatusEl.textContent = 'LCD changes save automatically.';
+      updateThemeSummary();
+    }
+
+    async function closeSettings() {
+      await flushSettingChanges();
+      settingsModalEl.hidden = true;
+    }
+
+    async function openCustomThemeModal() {
+      await flushSettingChanges();
+      applyTheme(CUSTOM_THEME_ID);
+      settingsModalEl.hidden = true;
+      customThemeModalEl.hidden = false;
+    }
+
+    function closeCustomThemeModal() {
+      customThemeModalEl.hidden = true;
+      settingsModalEl.hidden = false;
+      updateThemeSummary();
+    }
+
+    function openRestartPrompt(name, url) {
+      restartTextEl.textContent = 'Saved as ' + name + '. After restart, reconnect to ' + name + ' and open ' + (url || fallbackUrl) + '.';
+      restartModalEl.hidden = false;
+    }
+
+    function closeRestartPrompt() {
+      restartModalEl.hidden = true;
+    }
+
+    function markSafeNameDirty() {
+      safeNameDirty = safeNameEl.value.trim() !== lastSavedSafeName;
+    }
+
+    function readLcdDraft() {
+      return {
+        line1: l1El.value,
+        line2: l2El.value
+      };
+    }
+
+    function markLcdDirty() {
+      const draft = readLcdDraft();
+      lcdDirty = draft.line1 !== lastSavedLcd.line1 || draft.line2 !== lastSavedLcd.line2;
+    }
+
+    async function saveSafeNameIfNeeded() {
+      markSafeNameDirty();
+      if (!safeNameDirty) return true;
+
+      const requestedName = safeNameEl.value.trim();
       if (!requestedName) {
         playError();
-        setMessage('Enter a custom theme name first');
-        return;
+        safeNameStatusEl.textContent = 'Safe name cannot be empty.';
+        return false;
       }
 
-      const editingCustomId = activeThemeId.startsWith('custom:') ? activeThemeId.slice(7) : '';
-      const existingTheme = editingCustomId ? customThemes[editingCustomId] : null;
-      let targetId = editingCustomId;
-
-      if (!existingTheme || existingTheme.name.toLowerCase() !== requestedName.toLowerCase()) {
-        targetId = buildUniqueCustomThemeId(requestedName, editingCustomId);
-        if (editingCustomId && editingCustomId !== targetId) {
-          delete customThemes[editingCustomId];
+      try {
+        const json = await api('/rename', { name: requestedName });
+        const savedName = json.name || requestedName;
+        desiredSafeName = savedName;
+        desiredSafeUrl = json.url || fallbackUrl;
+        lastSavedSafeName = savedName;
+        safeNameDirty = false;
+        syncAccessUrls(json.url, json.name);
+        playSuccess();
+        if (json.restart_required) {
+          safeNameStatusEl.textContent = 'Saved. Restart required to apply the new Wi-Fi name.';
+          setMessage('Safe name saved. Restart required to apply the new Wi-Fi name.');
+          openRestartPrompt(savedName, desiredSafeUrl);
+        } else {
+          safeNameStatusEl.textContent = 'Safe name saved.';
+          setMessage('Safe name updated to ' + savedName);
         }
+        return true;
+      } catch (err) {
+        playError();
+        safeNameStatusEl.textContent = 'Safe name save failed.';
+        setMessage(String(err.message || err));
+        return false;
       }
-
-      customThemes[targetId] = {
-        name: requestedName,
-        values: normalizeThemeValues(getThemeEditorValues())
-      };
-
-      persistCustomThemes();
-      applyTheme('custom:' + targetId);
-      playSuccess();
-      setMessage('Custom theme saved: ' + requestedName);
     }
 
-    function deleteCustomTheme() {
-      if (!activeThemeId.startsWith('custom:')) {
-        playError();
-        setMessage('Select a custom theme to delete');
+    async function saveLcdIfNeeded(silent = true) {
+      if (lcdSaveTimer) {
+        clearTimeout(lcdSaveTimer);
+        lcdSaveTimer = null;
+      }
+
+      markLcdDirty();
+      if (!lcdDirty) {
+        lcdStatusEl.textContent = 'LCD changes save automatically.';
+        return true;
+      }
+
+      try {
+        const draft = readLcdDraft();
+        await api('/lcd', draft);
+        lastSavedLcd = draft;
+        lcdDirty = false;
+        lcdStatusEl.textContent = 'LCD text saved.';
+        if (!silent) {
+          playSuccess();
+          setMessage('LCD updated');
+        }
+        return true;
+      } catch (err) {
+        lcdStatusEl.textContent = 'LCD save failed. Check connection.';
+        if (!silent) {
+          playError();
+          setMessage(String(err.message || err));
+        }
+        return false;
+      }
+    }
+
+    function scheduleLcdSave() {
+      markLcdDirty();
+      if (!lcdDirty) {
+        lcdStatusEl.textContent = 'LCD changes save automatically.';
         return;
       }
 
-      const customId = activeThemeId.slice(7);
-      const themeName = customThemes[customId] ? customThemes[customId].name : 'Custom theme';
-      delete customThemes[customId];
-      persistCustomThemes();
-      applyTheme('preset:ember');
-      playSuccess();
-      setMessage('Deleted custom theme: ' + themeName);
+      lcdStatusEl.textContent = 'Saving LCD text...';
+      if (lcdSaveTimer) clearTimeout(lcdSaveTimer);
+      lcdSaveTimer = setTimeout(() => {
+        saveLcdIfNeeded(true);
+      }, 450);
+    }
+
+    async function flushSettingChanges() {
+      await saveSafeNameIfNeeded();
+      await saveLcdIfNeeded(true);
     }
 
     function syncAccessUrls(url, name) {
@@ -1049,6 +1173,9 @@
 
       if (document.activeElement !== safeNameEl) {
         safeNameEl.value = effectiveName;
+      }
+      if (!desiredSafeName) {
+        lastSavedSafeName = effectiveName;
       }
       localUrlEl.value = effectiveUrl;
       ipUrlEl.value = fallbackUrl;
@@ -1106,6 +1233,7 @@
         if (desiredSafeName && safeName === desiredSafeName) {
           desiredSafeName = '';
           desiredSafeUrl = '';
+          safeNameStatusEl.textContent = 'Changes save automatically when you leave this field.';
         }
         nameEl.textContent = safeName;
         syncAccessUrls(json.url, safeName);
@@ -1161,14 +1289,6 @@
       renderDots();
     }
 
-    function openSettings() {
-      settingsModalEl.hidden = false;
-    }
-
-    function closeSettings() {
-      settingsModalEl.hidden = true;
-    }
-
     async function submit() {
       if (pin.length !== 4) return;
       try {
@@ -1204,47 +1324,13 @@
       }
     }
 
-    async function saveLcd() {
-      try {
-        await api('/lcd', {
-          line1: document.getElementById('l1').value,
-          line2: document.getElementById('l2').value
-        });
-        setMessage('LCD updated');
-        playSuccess();
-        closeSettings();
-      } catch (err) {
-        playError();
-        setMessage(String(err.message || err));
-      }
-    }
-
-    async function renameSafe() {
-      const requestedName = safeNameEl.value.trim();
-      if (!requestedName) {
-        playError();
-        setMessage('Enter a safe name first');
-        return;
-      }
-
-      try {
-        const json = await api('/rename', { name: requestedName });
-        playSuccess();
-        desiredSafeName = json.name || requestedName;
-        desiredSafeUrl = json.url || fallbackUrl;
-        syncAccessUrls(json.url, json.name);
-        setMessage((json.restart_required ? 'Name saved. Tap Restart ESP32 to apply ' : 'Safe name updated to ') + (json.name || requestedName));
-      } catch (err) {
-        playError();
-        setMessage(String(err.message || err));
-      }
-    }
-
     async function restartSafe() {
       try {
         await api('/restart', {});
         playSuccess();
-        closeSettings();
+        closeRestartPrompt();
+        settingsModalEl.hidden = true;
+        customThemeModalEl.hidden = true;
         setMessage('ESP32 restarting. Reconnect to ' + (desiredSafeName || safeNameEl.value.trim() || nameEl.textContent) + ' and open ' + (desiredSafeUrl || localUrlEl.value || fallbackUrl));
       } catch (err) {
         playError();
@@ -1291,56 +1377,82 @@
       openSettings();
     };
 
-    document.getElementById('settingsCloseBtn').onclick = () => {
+    document.getElementById('settingsCloseBtn').onclick = async () => {
       playTap();
-      closeSettings();
+      await closeSettings();
     };
 
-    document.getElementById('settingsCancelBtn').onclick = () => {
+    themeSelectEl.onchange = async () => {
       playTap();
-      closeSettings();
-    };
-
-    themeSelectEl.onchange = () => {
-      playTap();
+      if (themeSelectEl.value === CUSTOM_THEME_ID) {
+        await openCustomThemeModal();
+        return;
+      }
       applyTheme(themeSelectEl.value);
-      setMessage('Theme loaded: ' + getThemeRecord(themeSelectEl.value).label);
+      setMessage('Theme loaded: ' + PRESET_THEMES[themeSelectEl.value].label);
     };
 
-    document.getElementById('renameBtn').onclick = () => {
+    document.getElementById('themeBackBtn').onclick = () => {
       playTap();
-      renameSafe();
+      closeCustomThemeModal();
     };
 
-    document.getElementById('restartBtn').onclick = () => {
+    document.getElementById('restartLaterBtn').onclick = () => {
+      playTap();
+      closeRestartPrompt();
+    };
+
+    document.getElementById('restartNowBtn').onclick = () => {
       playTap();
       restartSafe();
     };
 
-    document.getElementById('lcdBtn').onclick = () => {
-      playTap();
-      saveLcd();
-    };
-
-    document.getElementById('saveThemeBtn').onclick = () => {
-      playTap();
-      saveCustomTheme();
-    };
-
-    document.getElementById('deleteThemeBtn').onclick = () => {
-      playTap();
-      deleteCustomTheme();
-    };
+    customThemeNameEl.addEventListener('input', () => {
+      saveCustomThemeEdits();
+    });
 
     THEME_FIELDS.forEach(({ key }) => {
       themeInputEls[key].addEventListener('input', () => {
-        previewThemeFromInputs();
+        saveCustomThemeEdits();
       });
     });
 
-    settingsModalEl.onclick = (event) => {
+    safeNameEl.addEventListener('input', () => {
+      markSafeNameDirty();
+      safeNameStatusEl.textContent = safeNameDirty
+        ? 'Saving when you leave this field.'
+        : 'Changes save automatically when you leave this field.';
+    });
+
+    safeNameEl.addEventListener('blur', () => {
+      saveSafeNameIfNeeded();
+    });
+
+    l1El.addEventListener('input', () => {
+      scheduleLcdSave();
+    });
+
+    l2El.addEventListener('input', () => {
+      scheduleLcdSave();
+    });
+
+    l1El.addEventListener('blur', () => {
+      saveLcdIfNeeded(true);
+    });
+
+    l2El.addEventListener('blur', () => {
+      saveLcdIfNeeded(true);
+    });
+
+    settingsModalEl.onclick = async (event) => {
       if (event.target === settingsModalEl) {
-        closeSettings();
+        await closeSettings();
+      }
+    };
+
+    customThemeModalEl.onclick = (event) => {
+      if (event.target === customThemeModalEl) {
+        closeCustomThemeModal();
       }
     };
 
