@@ -18,7 +18,6 @@
     POST /lock    {"pin":"1234"}
     POST /unlock  {"pin":"1234"}
     POST /setpin  {"pin1":"1234","pin2":"1234"}
-    POST /lcd     {"line1":"...","line2":"..."}
 
   Minimal LCD text:
   - Shows WiFi on boot and leaves normal keypad UI afterwards.
@@ -101,6 +100,16 @@ static String wifiPasswordValue = WIFI_PASSWORD;
 static bool restartPending = false;
 static unsigned long restartAtMs = 0;
 
+enum UiMirrorEvent : uint8_t {
+  UI_MIRROR_NONE = 0,
+  UI_MIRROR_REMOTE_LOCKED,
+  UI_MIRROR_REMOTE_UNLOCKED,
+  UI_MIRROR_REMOTE_DENIED,
+  UI_MIRROR_REMOTE_PIN_UPDATED
+};
+
+static UiMirrorEvent pendingUiMirrorEvent = UI_MIRROR_NONE;
+
 // -----------------------------
 // Wi-Fi + HTTP
 // -----------------------------
@@ -109,6 +118,16 @@ WebServer server(80);
 static inline void serviceRemoteClients() {
   server.handleClient();
   delay(2);
+}
+
+static bool hasPendingUiMirrorEvent() {
+  return pendingUiMirrorEvent != UI_MIRROR_NONE;
+}
+
+static void queueUiMirrorEvent(UiMirrorEvent eventType, const char* reason) {
+  pendingUiMirrorEvent = eventType;
+  Serial.print("Queued UI mirror event: ");
+  Serial.println(reason);
 }
 
 static inline void lcdCenterPrint(uint8_t row, const char* text) {
@@ -247,6 +266,10 @@ static void scheduleRestart(const char* reason, unsigned long delayMs = 1500) {
   Serial.println(reason);
 }
 
+static bool shouldAbortInteractiveWait() {
+  return restartPending || hasPendingUiMirrorEvent();
+}
+
 static char readLoggedKey(const char* context) {
   char k = keypad.getKey();
   if (k) {
@@ -332,8 +355,12 @@ static void setupHttp() {
     String body = server.arg("plain");
     String pin = jsonGet(body, "pin");
     if (!is4Digits(pin)) return httpJson(400, "{\"ok\":false,\"err\":\"BAD_FORMAT\"}");
-    if (safeState.hasCode() && !verifyPinNoSideEffects(pin)) return httpJson(403, "{\"ok\":false,\"err\":\"BAD_PIN\"}");
+    if (safeState.hasCode() && !verifyPinNoSideEffects(pin)) {
+      queueUiMirrorEvent(UI_MIRROR_REMOTE_DENIED, "remote lock denied");
+      return httpJson(403, "{\"ok\":false,\"err\":\"BAD_PIN\"}");
+    }
     servoLock();
+    queueUiMirrorEvent(UI_MIRROR_REMOTE_LOCKED, "remote lock");
     httpJson(200, "{\"ok\":true}");
   });
 
@@ -342,8 +369,12 @@ static void setupHttp() {
     String pin = jsonGet(body, "pin");
     if (!is4Digits(pin)) return httpJson(400, "{\"ok\":false,\"err\":\"BAD_FORMAT\"}");
     bool ok = safeState.unlock(pin);
-    if (!ok) return httpJson(403, "{\"ok\":false,\"err\":\"BAD_PIN\"}");
+    if (!ok) {
+      queueUiMirrorEvent(UI_MIRROR_REMOTE_DENIED, "remote unlock denied");
+      return httpJson(403, "{\"ok\":false,\"err\":\"BAD_PIN\"}");
+    }
     servoUnlock();
+    queueUiMirrorEvent(UI_MIRROR_REMOTE_UNLOCKED, "remote unlock");
     httpJson(200, "{\"ok\":true}");
   });
 
@@ -355,15 +386,7 @@ static void setupHttp() {
     if (p1 != p2) return httpJson(400, "{\"ok\":false,\"err\":\"PIN_MISMATCH\"}");
     if (safeState.locked()) return httpJson(409, "{\"ok\":false,\"err\":\"LOCKED\"}");
     safeState.setCode(p1);
-    httpJson(200, "{\"ok\":true}");
-  });
-
-  server.on("/lcd", HTTP_POST, []() {
-    String body = server.arg("plain");
-    String l1 = jsonGet(body, "line1");
-    String l2 = jsonGet(body, "line2");
-    if (l1.length()) lcdSetLine(0, l1);
-    if (l2.length()) lcdSetLine(1, l2);
+    queueUiMirrorEvent(UI_MIRROR_REMOTE_PIN_UPDATED, "remote pin update");
     httpJson(200, "{\"ok\":true}");
   });
 
@@ -403,7 +426,6 @@ static void setupHttp() {
   server.on("/lock", HTTP_OPTIONS, []() { httpJson(204, "{}"); });
   server.on("/unlock", HTTP_OPTIONS, []() { httpJson(204, "{}"); });
   server.on("/setpin", HTTP_OPTIONS, []() { httpJson(204, "{}"); });
-  server.on("/lcd", HTTP_OPTIONS, []() { httpJson(204, "{}"); });
   server.on("/rename", HTTP_OPTIONS, []() { httpJson(204, "{}"); });
   server.on("/restart", HTTP_OPTIONS, []() { httpJson(204, "{}"); });
 
@@ -492,35 +514,37 @@ static bool setupWifiAp() {
 // -----------------------------
 // Existing keypad UI logic
 // -----------------------------
-static String readNumericCodeMasked(uint8_t length, const char* context) {
+static bool readNumericCodeMasked(uint8_t length, const char* context, String& code) {
   lcd.setCursor(5, 1);
   lcd.print("[____]");
   lcd.setCursor(6, 1);
 
-  String code;
   code.reserve(length);
 
   while (code.length() < length) {
     serviceRemoteClients();
+    if (shouldAbortInteractiveWait()) return false;
     char k = readLoggedKey(context);
     if (k >= '0' && k <= '9') {
       lcd.print('*');
       code += k;
     }
   }
-  return code;
+  return true;
 }
 
 static bool promptSetNewCode() {
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print("Enter new code:");
-  String newCode = readNumericCodeMasked(CODE_LEN, "new-pin");
+  String newCode;
+  if (!readNumericCodeMasked(CODE_LEN, "new-pin", newCode)) return false;
 
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print("Confirm new code");
-  String confirm = readNumericCodeMasked(CODE_LEN, "confirm-pin");
+  String confirm;
+  if (!readNumericCodeMasked(CODE_LEN, "confirm-pin", confirm)) return false;
 
   if (newCode == confirm) {
     safeState.setCode(newCode);
@@ -539,9 +563,17 @@ static char waitForKey(char a, char b, const char* context) {
   char k = readLoggedKey(context);
   while (k != a && k != b) {
     serviceRemoteClients();
+    if (shouldAbortInteractiveWait()) return '\0';
     k = readLoggedKey(context);
   }
   return k;
+}
+
+static void waitWithRemoteService(uint16_t totalMs) {
+  unsigned long startedAt = millis();
+  while ((uint32_t)(millis() - startedAt) < totalMs) {
+    serviceRemoteClients();
+  }
 }
 
 static void showProgressBar(uint16_t stepDelayMs) {
@@ -565,7 +597,7 @@ static void showUnlockedBanner() {
   lcdCenterPrint(0, "Unlocked!");
   lcd.setCursor(15, 0);
   lcd.write(ICON_UNLOCKED_CHAR);
-  delay(900);
+  waitWithRemoteService(900);
 }
 
 static void showLockedBanner() {
@@ -574,6 +606,56 @@ static void showLockedBanner() {
   lcd.write(ICON_LOCKED_CHAR);
   lcd.print(" Safe Locked! ");
   lcd.write(ICON_LOCKED_CHAR);
+}
+
+static void showAccessDeniedBanner() {
+  lcd.clear();
+  lcdCenterPrint(0, "Access Denied!");
+  showProgressBar(400);
+}
+
+static void showRemoteLockTransition() {
+  lcd.clear();
+  lcd.setCursor(4, 0);
+  lcd.write(ICON_UNLOCKED_CHAR);
+  lcd.print(" ");
+  lcd.write(ICON_RIGHT_ARROW);
+  lcd.print(" ");
+  lcd.write(ICON_LOCKED_CHAR);
+  showProgressBar(100);
+}
+
+static void showPinUpdatedBanner() {
+  lcd.clear();
+  lcdCenterPrint(0, "Code updated");
+  lcdCenterPrint(1, "Ready to lock");
+  waitWithRemoteService(1100);
+}
+
+static bool runPendingUiMirrorEvent() {
+  UiMirrorEvent eventType = pendingUiMirrorEvent;
+  if (eventType == UI_MIRROR_NONE) return false;
+
+  pendingUiMirrorEvent = UI_MIRROR_NONE;
+
+  switch (eventType) {
+    case UI_MIRROR_REMOTE_LOCKED:
+      showRemoteLockTransition();
+      return true;
+    case UI_MIRROR_REMOTE_UNLOCKED:
+      showProgressBar(200);
+      showUnlockedBanner();
+      return true;
+    case UI_MIRROR_REMOTE_DENIED:
+      showAccessDeniedBanner();
+      return true;
+    case UI_MIRROR_REMOTE_PIN_UPDATED:
+      showPinUpdatedBanner();
+      return true;
+    case UI_MIRROR_NONE:
+    default:
+      return false;
+  }
 }
 
 static void runUnlockedState() {
@@ -595,6 +677,7 @@ static void runUnlockedState() {
   }
 
   char k = waitForKey('*', '#', "unlocked-menu");
+  if (!k) return;
 
   bool readyToLock = true;
   if (k == '*' || mustSetCode) {
@@ -618,7 +701,8 @@ static void runUnlockedState() {
 static void runLockedState() {
   showLockedBanner();
 
-  String userCode = readNumericCodeMasked(CODE_LEN, "unlock-pin");
+  String userCode;
+  if (!readNumericCodeMasked(CODE_LEN, "unlock-pin", userCode)) return;
 
   bool ok = safeState.unlock(userCode);
   showProgressBar(200);
@@ -627,9 +711,7 @@ static void runLockedState() {
     showUnlockedBanner();
     servoUnlock();
   } else {
-    lcd.clear();
-    lcdCenterPrint(0, "Access Denied!");
-    showProgressBar(400);
+    showAccessDeniedBanner();
   }
 }
 
@@ -676,6 +758,10 @@ void loop() {
     Serial.println("Restarting ESP32 now...");
     delay(80);
     ESP.restart();
+  }
+
+  if (runPendingUiMirrorEvent()) {
+    return;
   }
 
   if (safeState.locked()) {

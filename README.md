@@ -18,7 +18,6 @@ Also supported:
 - Set PIN (4 digits, confirm)
 - Lock / unlock (servo rotates 90 degrees)
 - Show state clearly (connected + locked/unlocked)
-- Optional: write short messages to the safe LCD
 
 ## Tech
 - Flutter

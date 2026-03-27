@@ -515,7 +515,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(<!doctype html>
       <div class="modal-head">
         <div>
           <div class="modal-title">Settings</div>
-          <div class="hint">Theme changes apply instantly. Safe name and LCD changes save automatically.</div>
+          <div class="hint">Theme changes apply instantly. Safe name saves automatically.</div>
         </div>
         <button id="settingsCloseBtn" class="ghost small">Close</button>
       </div>
@@ -537,13 +537,6 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(<!doctype html>
         <input id="ipUrl" readonly value="http://192.168.4.1">
         <div class="settings-label">Wi-Fi password</div>
         <input id="wifiPassword" readonly value="">
-      </div>
-      <div class="settings-block">
-        <div class="settings-label">LCD line 1</div>
-        <input id="l1" placeholder="Line 1" value="Nexgen Safe">
-        <div class="settings-label">LCD line 2</div>
-        <input id="l2" placeholder="Line 2" value="Use the browser">
-        <div id="lcdStatus" class="mini-hint">LCD changes save automatically.</div>
       </div>
     </div>
   </div>
@@ -681,9 +674,6 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(<!doctype html>
     const localUrlEl = document.getElementById('localUrl');
     const ipUrlEl = document.getElementById('ipUrl');
     const wifiPasswordEl = document.getElementById('wifiPassword');
-    const l1El = document.getElementById('l1');
-    const l2El = document.getElementById('l2');
-    const lcdStatusEl = document.getElementById('lcdStatus');
     const ACTIVE_THEME_STORAGE_KEY = 'nexgen-safe-theme';
     const CUSTOM_THEME_STORAGE_KEY = 'nexgen-safe-custom-theme';
     const CUSTOM_THEME_ID = 'custom';
@@ -815,9 +805,6 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(<!doctype html>
     let activeThemeId = 'ember';
     let safeNameDirty = false;
     let lastSavedSafeName = safeNameEl.value.trim();
-    let lcdDirty = false;
-    let lcdSaveTimer = null;
-    let lastSavedLcd = { line1: l1El.value, line2: l2El.value };
 
     function getAudioContext() {
       const AudioCtor = window.AudioContext || window.webkitAudioContext;
@@ -1108,7 +1095,6 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(<!doctype html>
       safeNameStatusEl.textContent = desiredSafeName
         ? 'Saved. Restart required to apply the new Wi-Fi name.'
         : 'Changes save automatically when you leave this field.';
-      lcdStatusEl.textContent = 'LCD changes save automatically.';
       updateThemeSummary();
     }
 
@@ -1141,18 +1127,6 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(<!doctype html>
 
     function markSafeNameDirty() {
       safeNameDirty = safeNameEl.value.trim() !== lastSavedSafeName;
-    }
-
-    function readLcdDraft() {
-      return {
-        line1: l1El.value,
-        line2: l2El.value
-      };
-    }
-
-    function markLcdDirty() {
-      const draft = readLcdDraft();
-      lcdDirty = draft.line1 !== lastSavedLcd.line1 || draft.line2 !== lastSavedLcd.line2;
     }
 
     async function saveSafeNameIfNeeded() {
@@ -1192,56 +1166,8 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(<!doctype html>
       }
     }
 
-    async function saveLcdIfNeeded(silent = true) {
-      if (lcdSaveTimer) {
-        clearTimeout(lcdSaveTimer);
-        lcdSaveTimer = null;
-      }
-
-      markLcdDirty();
-      if (!lcdDirty) {
-        lcdStatusEl.textContent = 'LCD changes save automatically.';
-        return true;
-      }
-
-      try {
-        const draft = readLcdDraft();
-        await api('/lcd', draft);
-        lastSavedLcd = draft;
-        lcdDirty = false;
-        lcdStatusEl.textContent = 'LCD text saved.';
-        if (!silent) {
-          playSuccess();
-          setMessage('LCD updated');
-        }
-        return true;
-      } catch (err) {
-        lcdStatusEl.textContent = 'LCD save failed. Check connection.';
-        if (!silent) {
-          playError();
-          setMessage(String(err.message || err));
-        }
-        return false;
-      }
-    }
-
-    function scheduleLcdSave() {
-      markLcdDirty();
-      if (!lcdDirty) {
-        lcdStatusEl.textContent = 'LCD changes save automatically.';
-        return;
-      }
-
-      lcdStatusEl.textContent = 'Saving LCD text...';
-      if (lcdSaveTimer) clearTimeout(lcdSaveTimer);
-      lcdSaveTimer = setTimeout(() => {
-        saveLcdIfNeeded(true);
-      }, 450);
-    }
-
     async function flushSettingChanges() {
       await saveSafeNameIfNeeded();
-      await saveLcdIfNeeded(true);
     }
 
     function syncAccessDetails(url, name, password) {
@@ -1511,22 +1437,6 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(<!doctype html>
 
     safeNameEl.addEventListener('blur', () => {
       saveSafeNameIfNeeded();
-    });
-
-    l1El.addEventListener('input', () => {
-      scheduleLcdSave();
-    });
-
-    l2El.addEventListener('input', () => {
-      scheduleLcdSave();
-    });
-
-    l1El.addEventListener('blur', () => {
-      saveLcdIfNeeded(true);
-    });
-
-    l2El.addEventListener('blur', () => {
-      saveLcdIfNeeded(true);
     });
 
     settingsModalEl.onclick = async (event) => {

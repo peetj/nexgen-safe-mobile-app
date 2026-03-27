@@ -20,7 +20,6 @@ This is a browser UI for controlling the ESP32 safe over HTTP while connected to
 1. Tap `Unlock`, enter the current 4-digit PIN, then tap `Go`.
 2. Tap `Lock`, enter the current 4-digit PIN, then tap `Go`.
 3. Tap `Set PIN` to change the safe PIN, then enter the new 4-digit PIN twice.
-4. Use the LCD section only if you want to write a short message to the safe display.
 
 ## Setup
 1. Flash `firmware/Nexgen_Safe_BLE_WIFI.ino` to the ESP32.
@@ -39,4 +38,3 @@ If you host the page somewhere else, it still works because the firmware enables
 - `POST /lock` `{ "pin": "1234" }`
 - `POST /unlock` `{ "pin": "1234" }`
 - `POST /setpin` `{ "pin1":"1234", "pin2":"1234" }`
-- `POST /lcd` `{ "line1":"...", "line2":"..." }`
