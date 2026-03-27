@@ -1,8 +1,7 @@
 #ifndef WEB_UI_H
 #define WEB_UI_H
 
-static const char INDEX_HTML[] PROGMEM = R"rawliteral(
-<!doctype html>
+static const char INDEX_HTML[] PROGMEM = R"rawliteral(<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -10,9 +9,14 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
   <title>Nexgen Safe</title>
   <style>
     :root{
+      --bg-top:#15181e;
+      --bg-bottom:#0b0d12;
+      --panel-top:#22262e;
+      --panel-bottom:#14181d;
+      --modal-top:#1b1f27;
+      --modal-bottom:#11141a;
       --orange:#ff5e19;
       --orange-soft:#ff8a47;
-      --charcoal:#15181e;
       --offwhite:#f2f2f0;
       --green:#34d399;
       --red:#fb7185;
@@ -20,6 +24,40 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       --cyan:#5eead4;
       --glow-hot:rgba(255,94,25,.22);
       --glow-cool:rgba(94,234,212,.14);
+      --brand-hot-shadow:rgba(255,94,25,.28);
+      --brand-cool-start:#ffe27a;
+      --brand-cool-end:#5eead4;
+      --line-soft:rgba(242,242,240,.08);
+      --line-strong:rgba(242,242,240,.14);
+      --text-mid:rgba(242,242,240,.72);
+      --text-low:rgba(242,242,240,.68);
+      --text-subtle:rgba(242,242,240,.52);
+      --text-faint:rgba(242,242,240,.42);
+      --card-shadow:rgba(0,0,0,.24);
+      --primary-shadow:rgba(255,94,25,.24);
+      --ghost-bg:rgba(255,255,255,.03);
+      --ghost-border:rgba(242,242,240,.14);
+      --tonal-bg-top:rgba(94,234,212,.16);
+      --tonal-bg-bottom:rgba(94,234,212,.08);
+      --tonal-border:rgba(94,234,212,.30);
+      --key-bg:rgba(242,242,240,.05);
+      --key-border:rgba(242,242,240,.10);
+      --field-bg:rgba(0,0,0,.22);
+      --field-border:rgba(242,242,240,.14);
+      --dot-bg:rgba(242,242,240,.16);
+      --dot-glow:rgba(242,242,240,.26);
+      --status-locked-glow:rgba(251,113,133,.28);
+      --status-locked-border:rgba(251,113,133,.34);
+      --status-locked-badge-border:rgba(251,113,133,.30);
+      --status-locked-badge-top:rgba(251,113,133,.12);
+      --status-unlocked-glow:rgba(52,211,153,.24);
+      --status-unlocked-border:rgba(52,211,153,.34);
+      --status-unlocked-badge-border:rgba(52,211,153,.28);
+      --status-unlocked-badge-top:rgba(52,211,153,.12);
+      --status-offline-glow:rgba(251,191,36,.24);
+      --status-offline-border:rgba(251,191,36,.30);
+      --status-offline-badge-border:rgba(251,191,36,.28);
+      --status-offline-badge-top:rgba(251,191,36,.12);
     }
     *{box-sizing:border-box}
     body{
@@ -32,48 +70,18 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       background:
         radial-gradient(circle at top left, var(--glow-hot), transparent 30%),
         radial-gradient(circle at top right, var(--glow-cool), transparent 28%),
-        linear-gradient(180deg, #15181e 0%, #0b0d12 100%);
-    }
-    body[data-theme="coast"]{
-      --orange:#2dd4bf;
-      --orange-soft:#67e8f9;
-      --green:#22c55e;
-      --red:#f97316;
-      --amber:#facc15;
-      --cyan:#38bdf8;
-      --glow-hot:rgba(45,212,191,.22);
-      --glow-cool:rgba(56,189,248,.16);
-    }
-    body[data-theme="vault"]{
-      --orange:#f59e0b;
-      --orange-soft:#fde047;
-      --green:#84cc16;
-      --red:#ef4444;
-      --amber:#f59e0b;
-      --cyan:#d4d4d8;
-      --glow-hot:rgba(245,158,11,.22);
-      --glow-cool:rgba(212,212,216,.14);
-    }
-    body[data-theme="midnight"]{
-      --orange:#60a5fa;
-      --orange-soft:#a78bfa;
-      --green:#22d3ee;
-      --red:#f472b6;
-      --amber:#c084fc;
-      --cyan:#38bdf8;
-      --glow-hot:rgba(96,165,250,.2);
-      --glow-cool:rgba(167,139,250,.16);
+        linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
     }
     header{
       padding:22px 18px 14px;
-      border-bottom:1px solid rgba(242,242,240,.08);
+      border-bottom:1px solid var(--line-soft);
       background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,0));
     }
     .brand-tag{
       font-size:11px;
       letter-spacing:.36em;
       text-transform:uppercase;
-      color:rgba(242,242,240,.55);
+      color:var(--text-subtle);
       margin-bottom:8px;
     }
     h1{
@@ -86,10 +94,10 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
     }
     .brand-hot{
       color:var(--orange-soft);
-      text-shadow:0 0 22px rgba(255,94,25,.28);
+      text-shadow:0 0 22px var(--brand-hot-shadow);
     }
     .brand-cool{
-      background:linear-gradient(135deg, #ffe27a 0%, #5eead4 100%);
+      background:linear-gradient(135deg, var(--brand-cool-start) 0%, var(--brand-cool-end) 100%);
       -webkit-background-clip:text;
       background-clip:text;
       color:transparent;
@@ -102,12 +110,12 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       padding:18px 16px 12px;
     }
     .card{
-      background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
-      border:1px solid rgba(242,242,240,.08);
+      background:linear-gradient(180deg, var(--panel-top), var(--panel-bottom));
+      border:1px solid var(--line-soft);
       border-radius:22px;
       padding:16px;
       margin-bottom:14px;
-      box-shadow:0 18px 40px rgba(0,0,0,.24);
+      box-shadow:0 18px 40px var(--card-shadow);
     }
     .status-card{
       position:relative;
@@ -125,16 +133,16 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       pointer-events:none;
     }
     .status-card.locked{
-      --glow:rgba(251,113,133,.28);
-      border-color:rgba(251,113,133,.34);
+      --glow:var(--status-locked-glow);
+      border-color:var(--status-locked-border);
     }
     .status-card.unlocked{
-      --glow:rgba(52,211,153,.24);
-      border-color:rgba(52,211,153,.34);
+      --glow:var(--status-unlocked-glow);
+      border-color:var(--status-unlocked-border);
     }
     .status-card.offline{
-      --glow:rgba(251,191,36,.24);
-      border-color:rgba(251,191,36,.3);
+      --glow:var(--status-offline-glow);
+      border-color:var(--status-offline-border);
     }
     .topline{
       display:flex;
@@ -147,11 +155,11 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       font-size:13px;
       letter-spacing:.14em;
       text-transform:uppercase;
-      color:rgba(242,242,240,.72);
+      color:var(--text-mid);
     }
     .ip{
       font-size:13px;
-      color:rgba(242,242,240,.68);
+      color:var(--text-low);
       white-space:nowrap;
     }
     .state-badge{
@@ -165,7 +173,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       font-weight:900;
       letter-spacing:.16em;
       text-transform:uppercase;
-      border:1px solid rgba(242,242,240,.1);
+      border:1px solid var(--line-soft);
       background:rgba(0,0,0,.22);
       box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
     }
@@ -180,25 +188,25 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
     }
     .status-card.locked .state-badge{
       color:var(--red);
-      border-color:rgba(251,113,133,.3);
-      background:linear-gradient(180deg, rgba(251,113,133,.12), rgba(0,0,0,.18));
+      border-color:var(--status-locked-badge-border);
+      background:linear-gradient(180deg, var(--status-locked-badge-top), rgba(0,0,0,.18));
     }
     .status-card.unlocked .state-badge{
       color:var(--green);
-      border-color:rgba(52,211,153,.28);
-      background:linear-gradient(180deg, rgba(52,211,153,.12), rgba(0,0,0,.18));
+      border-color:var(--status-unlocked-badge-border);
+      background:linear-gradient(180deg, var(--status-unlocked-badge-top), rgba(0,0,0,.18));
     }
     .status-card.offline .state-badge{
       color:var(--amber);
-      border-color:rgba(251,191,36,.28);
-      background:linear-gradient(180deg, rgba(251,191,36,.12), rgba(0,0,0,.18));
+      border-color:var(--status-offline-badge-border);
+      background:linear-gradient(180deg, var(--status-offline-badge-top), rgba(0,0,0,.18));
     }
     .msg{
       min-height:18px;
       margin:12px 0 0;
       font-size:13px;
       letter-spacing:.04em;
-      color:rgba(242,242,240,.82);
+      color:var(--text-mid);
     }
     .row{
       display:flex;
@@ -215,20 +223,25 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       transition:transform .08s ease, filter .15s ease, border-color .15s ease;
     }
     button:active{transform:translateY(1px) scale(.99)}
+    button:disabled{
+      opacity:.45;
+      cursor:not-allowed;
+      filter:saturate(.5);
+    }
     button.primary{
-      background:linear-gradient(135deg, var(--orange) 0%, #ff9d5c 100%);
+      background:linear-gradient(135deg, var(--orange) 0%, var(--orange-soft) 100%);
       color:#111;
-      box-shadow:0 10px 26px rgba(255,94,25,.24);
+      box-shadow:0 10px 26px var(--primary-shadow);
     }
     button.tonal{
-      background:linear-gradient(180deg, rgba(94,234,212,.16), rgba(94,234,212,.08));
+      background:linear-gradient(180deg, var(--tonal-bg-top), var(--tonal-bg-bottom));
       color:var(--offwhite);
-      border:1px solid rgba(94,234,212,.3);
+      border:1px solid var(--tonal-border);
     }
     button.ghost{
-      background:rgba(255,255,255,.03);
+      background:var(--ghost-bg);
       color:var(--offwhite);
-      border:1px solid rgba(242,242,240,.14);
+      border:1px solid var(--ghost-border);
     }
     button.small{
       padding:10px 12px;
@@ -247,7 +260,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       font-size:12px;
       letter-spacing:.24em;
       text-transform:uppercase;
-      color:rgba(242,242,240,.6);
+      color:var(--text-low);
     }
     .prompt:empty{display:none}
     .dots{
@@ -261,12 +274,12 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       width:14px;
       height:14px;
       border-radius:50%;
-      background:rgba(242,242,240,.16);
-      border:1px solid rgba(242,242,240,.08);
+      background:var(--dot-bg);
+      border:1px solid var(--line-soft);
     }
     .dot.filled{
       background:var(--offwhite);
-      box-shadow:0 0 14px rgba(242,242,240,.26);
+      box-shadow:0 0 14px var(--dot-glow);
     }
     .grid{
       display:grid;
@@ -276,8 +289,8 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
     }
     .key{
       min-height:60px;
-      background:rgba(242,242,240,.05);
-      border:1px solid rgba(242,242,240,.1);
+      background:var(--key-bg);
+      border:1px solid var(--key-border);
       color:var(--offwhite);
       font-size:22px;
     }
@@ -304,8 +317,10 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
     }
     .modal-card{
       width:min(100%, 560px);
-      background:linear-gradient(180deg, #1b1f27 0%, #11141a 100%);
-      border:1px solid rgba(242,242,240,.1);
+      max-height:calc(100vh - 32px);
+      overflow:auto;
+      background:linear-gradient(180deg, var(--modal-top) 0%, var(--modal-bottom) 100%);
+      border:1px solid var(--line-soft);
       border-radius:24px;
       padding:18px;
       box-shadow:0 24px 60px rgba(0,0,0,.38);
@@ -325,7 +340,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       text-transform:uppercase;
     }
     .hint{
-      color:rgba(242,242,240,.66);
+      color:var(--text-low);
       font-size:12px;
       line-height:1.5;
     }
@@ -334,14 +349,14 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       font-size:11px;
       letter-spacing:.16em;
       text-transform:uppercase;
-      color:rgba(242,242,240,.52);
+      color:var(--text-subtle);
     }
     input{
       width:100%;
       padding:14px;
       border-radius:14px;
-      border:1px solid rgba(242,242,240,.14);
-      background:rgba(0,0,0,.22);
+      border:1px solid var(--field-border);
+      background:var(--field-bg);
       color:var(--offwhite);
       font-size:15px;
       margin-bottom:10px;
@@ -350,14 +365,67 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       width:100%;
       padding:14px;
       border-radius:14px;
-      border:1px solid rgba(242,242,240,.14);
-      background:rgba(0,0,0,.22);
+      border:1px solid var(--field-border);
+      background:var(--field-bg);
       color:var(--offwhite);
       font-size:15px;
       margin-bottom:10px;
     }
+    .settings-block{
+      margin-top:14px;
+      padding-top:14px;
+      border-top:1px solid var(--line-soft);
+    }
+    .theme-grid{
+      display:grid;
+      grid-template-columns:repeat(2, minmax(0, 1fr));
+      gap:10px;
+      margin:10px 0 4px;
+    }
+    .theme-color{
+      padding:12px;
+      border-radius:16px;
+      border:1px solid var(--line-soft);
+      background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+    }
+    .theme-color label{
+      display:block;
+      margin-bottom:8px;
+      font-size:11px;
+      letter-spacing:.14em;
+      text-transform:uppercase;
+      color:var(--text-low);
+    }
+    .theme-color input[type="color"]{
+      width:100%;
+      min-height:46px;
+      margin:0;
+      padding:4px;
+      cursor:pointer;
+      border-radius:12px;
+      border:1px solid var(--field-border);
+      background:var(--field-bg);
+    }
+    .theme-color input[type="color"]::-webkit-color-swatch-wrapper{padding:0}
+    .theme-color input[type="color"]::-webkit-color-swatch{
+      border:0;
+      border-radius:8px;
+    }
+    .theme-tools{
+      margin-top:8px;
+    }
+    .mini-hint{
+      margin:-2px 0 8px;
+      font-size:11px;
+      line-height:1.5;
+      color:var(--text-subtle);
+    }
+    .theme-delete{
+      border-color:var(--status-locked-badge-border);
+      color:var(--red);
+    }
     input[readonly]{
-      color:rgba(242,242,240,.78);
+      color:var(--text-mid);
     }
     .site-footer{
       padding:0 18px 20px;
@@ -365,13 +433,14 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       font-size:12px;
       letter-spacing:.14em;
       text-transform:uppercase;
-      color:rgba(242,242,240,.42);
+      color:var(--text-faint);
     }
     @media (max-width:460px){
       h1{font-size:28px}
       .state-badge{font-size:25px;min-height:72px;padding:16px 18px}
       .topline{align-items:flex-start;flex-direction:column}
       .ip{margin-top:-6px}
+      .theme-grid{grid-template-columns:1fr}
     }
   </style>
 </head>
@@ -421,22 +490,83 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
         <button id="settingsCloseBtn" class="ghost small">Close</button>
       </div>
       <div class="settings-label">Theme</div>
-      <select id="themeSelect">
-        <option value="ember">Nexgen Ember</option>
-        <option value="coast">Coast Mint</option>
-        <option value="vault">Vault Gold</option>
-        <option value="midnight">Midnight Signal</option>
-      </select>
+      <select id="themeSelect"></select>
+      <div class="mini-hint">Choose a built-in theme or one of your saved custom themes.</div>
+      <div class="settings-label">Custom theme name</div>
+      <input id="customThemeName" maxlength="24" placeholder="My Safe Theme" value="">
+      <div class="theme-tools footer-row">
+        <button id="saveThemeBtn" class="tonal">Save Theme</button>
+        <button id="deleteThemeBtn" class="ghost theme-delete">Delete Theme</button>
+      </div>
+      <div class="mini-hint">Change the colors below, then save them as a named custom theme for this phone or browser.</div>
+      <div class="theme-grid">
+        <div class="theme-color">
+          <label for="colorBgTop">Page Top</label>
+          <input id="colorBgTop" type="color" value="#15181e">
+        </div>
+        <div class="theme-color">
+          <label for="colorBgBottom">Page Bottom</label>
+          <input id="colorBgBottom" type="color" value="#0b0d12">
+        </div>
+        <div class="theme-color">
+          <label for="colorPanelTop">Panel Top</label>
+          <input id="colorPanelTop" type="color" value="#22262e">
+        </div>
+        <div class="theme-color">
+          <label for="colorPanelBottom">Panel Bottom</label>
+          <input id="colorPanelBottom" type="color" value="#14181d">
+        </div>
+        <div class="theme-color">
+          <label for="colorModalTop">Settings Top</label>
+          <input id="colorModalTop" type="color" value="#1b1f27">
+        </div>
+        <div class="theme-color">
+          <label for="colorModalBottom">Settings Bottom</label>
+          <input id="colorModalBottom" type="color" value="#11141a">
+        </div>
+        <div class="theme-color">
+          <label for="colorOrange">Primary</label>
+          <input id="colorOrange" type="color" value="#ff5e19">
+        </div>
+        <div class="theme-color">
+          <label for="colorOrangeSoft">Secondary</label>
+          <input id="colorOrangeSoft" type="color" value="#ff8a47">
+        </div>
+        <div class="theme-color">
+          <label for="colorCyan">Accent</label>
+          <input id="colorCyan" type="color" value="#5eead4">
+        </div>
+        <div class="theme-color">
+          <label for="colorOffwhite">Text</label>
+          <input id="colorOffwhite" type="color" value="#f2f2f0">
+        </div>
+        <div class="theme-color">
+          <label for="colorGreen">Success</label>
+          <input id="colorGreen" type="color" value="#34d399">
+        </div>
+        <div class="theme-color">
+          <label for="colorRed">Danger</label>
+          <input id="colorRed" type="color" value="#fb7185">
+        </div>
+        <div class="theme-color">
+          <label for="colorAmber">Warning</label>
+          <input id="colorAmber" type="color" value="#fbbf24">
+        </div>
+      </div>
+      <div class="settings-block">
       <div class="settings-label">Safe name</div>
       <input id="safeName" maxlength="31" placeholder="NexgenSafe-01" value="NexgenSafe-01">
       <div class="settings-label">Local hostname</div>
       <input id="localUrl" readonly value="http://nexgensafe-01.local">
       <div class="settings-label">Fallback IP</div>
       <input id="ipUrl" readonly value="http://192.168.4.1">
+      </div>
+      <div class="settings-block">
       <div class="settings-label">LCD line 1</div>
       <input id="l1" placeholder="Line 1" value="Nexgen Safe">
       <div class="settings-label">LCD line 2</div>
       <input id="l2" placeholder="Line 2" value="Use the browser">
+      </div>
       <div class="footer-row">
         <button id="renameBtn" class="tonal">Save Name</button>
         <button id="restartBtn" class="ghost">Restart ESP32</button>
@@ -460,10 +590,102 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
     const gridEl = document.getElementById('grid');
     const settingsModalEl = document.getElementById('settingsModal');
     const themeSelectEl = document.getElementById('themeSelect');
+    const customThemeNameEl = document.getElementById('customThemeName');
     const safeNameEl = document.getElementById('safeName');
     const localUrlEl = document.getElementById('localUrl');
     const ipUrlEl = document.getElementById('ipUrl');
-    const THEME_STORAGE_KEY = 'nexgen-safe-theme';
+    const ACTIVE_THEME_STORAGE_KEY = 'nexgen-safe-theme';
+    const CUSTOM_THEMES_STORAGE_KEY = 'nexgen-safe-custom-themes';
+    const THEME_FIELDS = [
+      { key: 'bgTop', inputId: 'colorBgTop' },
+      { key: 'bgBottom', inputId: 'colorBgBottom' },
+      { key: 'panelTop', inputId: 'colorPanelTop' },
+      { key: 'panelBottom', inputId: 'colorPanelBottom' },
+      { key: 'modalTop', inputId: 'colorModalTop' },
+      { key: 'modalBottom', inputId: 'colorModalBottom' },
+      { key: 'orange', inputId: 'colorOrange' },
+      { key: 'orangeSoft', inputId: 'colorOrangeSoft' },
+      { key: 'cyan', inputId: 'colorCyan' },
+      { key: 'offwhite', inputId: 'colorOffwhite' },
+      { key: 'green', inputId: 'colorGreen' },
+      { key: 'red', inputId: 'colorRed' },
+      { key: 'amber', inputId: 'colorAmber' }
+    ];
+    const PRESET_THEMES = {
+      ember: {
+        label: 'Nexgen Ember',
+        values: {
+          bgTop: '#15181e',
+          bgBottom: '#0b0d12',
+          panelTop: '#22262e',
+          panelBottom: '#14181d',
+          modalTop: '#1b1f27',
+          modalBottom: '#11141a',
+          orange: '#ff5e19',
+          orangeSoft: '#ff8a47',
+          cyan: '#5eead4',
+          offwhite: '#f2f2f0',
+          green: '#34d399',
+          red: '#fb7185',
+          amber: '#fbbf24'
+        }
+      },
+      coast: {
+        label: 'Coast Mint',
+        values: {
+          bgTop: '#0b1720',
+          bgBottom: '#041118',
+          panelTop: '#14323a',
+          panelBottom: '#0a1f26',
+          modalTop: '#12313a',
+          modalBottom: '#0a1e26',
+          orange: '#2dd4bf',
+          orangeSoft: '#67e8f9',
+          cyan: '#38bdf8',
+          offwhite: '#effcfb',
+          green: '#22c55e',
+          red: '#f97316',
+          amber: '#facc15'
+        }
+      },
+      vault: {
+        label: 'Vault Gold',
+        values: {
+          bgTop: '#1c1608',
+          bgBottom: '#0d0b04',
+          panelTop: '#32270e',
+          panelBottom: '#181208',
+          modalTop: '#2a210d',
+          modalBottom: '#151108',
+          orange: '#f59e0b',
+          orangeSoft: '#fde047',
+          cyan: '#d4d4d8',
+          offwhite: '#fff7db',
+          green: '#84cc16',
+          red: '#ef4444',
+          amber: '#f59e0b'
+        }
+      },
+      midnight: {
+        label: 'Midnight Signal',
+        values: {
+          bgTop: '#0b1020',
+          bgBottom: '#040712',
+          panelTop: '#151b34',
+          panelBottom: '#0a1022',
+          modalTop: '#161d38',
+          modalBottom: '#0a1022',
+          orange: '#60a5fa',
+          orangeSoft: '#a78bfa',
+          cyan: '#38bdf8',
+          offwhite: '#edf2ff',
+          green: '#22d3ee',
+          red: '#f472b6',
+          amber: '#c084fc'
+        }
+      }
+    };
+    const themeInputEls = Object.fromEntries(THEME_FIELDS.map(({ key, inputId }) => [key, document.getElementById(inputId)]));
 
     let action = 'none';
     let pin = '';
@@ -472,6 +694,8 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
     let audioCtx = null;
     let desiredSafeName = '';
     let desiredSafeUrl = '';
+    let customThemes = {};
+    let activeThemeId = 'preset:ember';
 
     function getAudioContext() {
       const AudioCtor = window.AudioContext || window.webkitAudioContext;
@@ -527,22 +751,299 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       msgEl.textContent = text || '';
     }
 
-    function applyTheme(theme, persist = true) {
-      const allowed = ['ember', 'coast', 'vault', 'midnight'];
-      const nextTheme = allowed.includes(theme) ? theme : 'ember';
-      document.body.dataset.theme = nextTheme;
-      themeSelectEl.value = nextTheme;
+    function isHexColor(value) {
+      return /^#[0-9a-f]{6}$/i.test(value || '');
+    }
+
+    function normalizeHex(value, fallback) {
+      return isHexColor(value) ? value.toLowerCase() : fallback;
+    }
+
+    function hexToRgb(hex) {
+      const clean = normalizeHex(hex, '#000000').slice(1);
+      return {
+        r: parseInt(clean.slice(0, 2), 16),
+        g: parseInt(clean.slice(2, 4), 16),
+        b: parseInt(clean.slice(4, 6), 16)
+      };
+    }
+
+    function rgba(hex, alpha) {
+      const rgb = hexToRgb(hex);
+      return 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',' + alpha + ')';
+    }
+
+    function cloneThemeValues(values) {
+      return JSON.parse(JSON.stringify(values));
+    }
+
+    function normalizeThemeValues(values) {
+      const fallback = PRESET_THEMES.ember.values;
+      const normalized = {};
+      THEME_FIELDS.forEach(({ key }) => {
+        normalized[key] = normalizeHex(values && values[key], fallback[key]);
+      });
+      return normalized;
+    }
+
+    function buildThemeCssVars(values) {
+      const theme = normalizeThemeValues(values);
+      return {
+        '--bg-top': theme.bgTop,
+        '--bg-bottom': theme.bgBottom,
+        '--panel-top': theme.panelTop,
+        '--panel-bottom': theme.panelBottom,
+        '--modal-top': theme.modalTop,
+        '--modal-bottom': theme.modalBottom,
+        '--orange': theme.orange,
+        '--orange-soft': theme.orangeSoft,
+        '--cyan': theme.cyan,
+        '--offwhite': theme.offwhite,
+        '--green': theme.green,
+        '--red': theme.red,
+        '--amber': theme.amber,
+        '--glow-hot': rgba(theme.orange, 0.22),
+        '--glow-cool': rgba(theme.cyan, 0.16),
+        '--brand-hot-shadow': rgba(theme.orange, 0.28),
+        '--brand-cool-start': theme.orangeSoft,
+        '--brand-cool-end': theme.cyan,
+        '--line-soft': rgba(theme.offwhite, 0.08),
+        '--line-strong': rgba(theme.offwhite, 0.14),
+        '--text-mid': rgba(theme.offwhite, 0.72),
+        '--text-low': rgba(theme.offwhite, 0.68),
+        '--text-subtle': rgba(theme.offwhite, 0.52),
+        '--text-faint': rgba(theme.offwhite, 0.42),
+        '--card-shadow': rgba(theme.bgBottom, 0.55),
+        '--primary-shadow': rgba(theme.orange, 0.24),
+        '--ghost-bg': rgba(theme.offwhite, 0.03),
+        '--ghost-border': rgba(theme.offwhite, 0.14),
+        '--tonal-bg-top': rgba(theme.cyan, 0.16),
+        '--tonal-bg-bottom': rgba(theme.cyan, 0.08),
+        '--tonal-border': rgba(theme.cyan, 0.30),
+        '--key-bg': rgba(theme.offwhite, 0.05),
+        '--key-border': rgba(theme.offwhite, 0.10),
+        '--field-bg': rgba(theme.bgBottom, 0.55),
+        '--field-border': rgba(theme.offwhite, 0.14),
+        '--dot-bg': rgba(theme.offwhite, 0.16),
+        '--dot-glow': rgba(theme.offwhite, 0.26),
+        '--status-locked-glow': rgba(theme.red, 0.28),
+        '--status-locked-border': rgba(theme.red, 0.34),
+        '--status-locked-badge-border': rgba(theme.red, 0.30),
+        '--status-locked-badge-top': rgba(theme.red, 0.12),
+        '--status-unlocked-glow': rgba(theme.green, 0.24),
+        '--status-unlocked-border': rgba(theme.green, 0.34),
+        '--status-unlocked-badge-border': rgba(theme.green, 0.28),
+        '--status-unlocked-badge-top': rgba(theme.green, 0.12),
+        '--status-offline-glow': rgba(theme.amber, 0.24),
+        '--status-offline-border': rgba(theme.amber, 0.30),
+        '--status-offline-badge-border': rgba(theme.amber, 0.28),
+        '--status-offline-badge-top': rgba(theme.amber, 0.12)
+      };
+    }
+
+    function applyThemeValues(values) {
+      const cssVars = buildThemeCssVars(values);
+      Object.keys(cssVars).forEach((key) => {
+        document.documentElement.style.setProperty(key, cssVars[key]);
+      });
+    }
+
+    function setThemeEditorValues(values) {
+      const normalized = normalizeThemeValues(values);
+      THEME_FIELDS.forEach(({ key }) => {
+        themeInputEls[key].value = normalized[key];
+      });
+    }
+
+    function getThemeEditorValues() {
+      const values = {};
+      THEME_FIELDS.forEach(({ key }) => {
+        values[key] = normalizeHex(themeInputEls[key].value, PRESET_THEMES.ember.values[key]);
+      });
+      return values;
+    }
+
+    function normalizeStoredThemeId(rawValue) {
+      if (!rawValue) return 'preset:ember';
+      if (rawValue.startsWith('preset:') || rawValue.startsWith('custom:')) return rawValue;
+      if (PRESET_THEMES[rawValue]) return 'preset:' + rawValue;
+      return 'preset:ember';
+    }
+
+    function slugifyThemeName(name) {
+      const slug = String(name || '')
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 24);
+      return slug || 'theme';
+    }
+
+    function buildUniqueCustomThemeId(name, ignoreId = '') {
+      const base = slugifyThemeName(name);
+      let candidate = base;
+      let counter = 2;
+      while (customThemes[candidate] && candidate !== ignoreId) {
+        candidate = base + '-' + counter;
+        counter += 1;
+      }
+      return candidate;
+    }
+
+    function loadCustomThemes() {
+      customThemes = {};
+      try {
+        const parsed = JSON.parse(localStorage.getItem(CUSTOM_THEMES_STORAGE_KEY) || '{}');
+        Object.keys(parsed || {}).forEach((id) => {
+          const item = parsed[id];
+          if (!item || typeof item.name !== 'string') return;
+          const trimmedName = item.name.trim().slice(0, 24);
+          if (!trimmedName) return;
+          customThemes[id] = {
+            name: trimmedName,
+            values: normalizeThemeValues(item.values)
+          };
+        });
+      } catch (_) {
+        customThemes = {};
+      }
+    }
+
+    function persistCustomThemes() {
+      localStorage.setItem(CUSTOM_THEMES_STORAGE_KEY, JSON.stringify(customThemes));
+    }
+
+    function renderThemeOptions(selectedId = activeThemeId) {
+      themeSelectEl.innerHTML = '';
+
+      const presetGroup = document.createElement('optgroup');
+      presetGroup.label = 'Built-in';
+      Object.entries(PRESET_THEMES).forEach(([id, theme]) => {
+        const option = document.createElement('option');
+        option.value = 'preset:' + id;
+        option.textContent = theme.label;
+        presetGroup.appendChild(option);
+      });
+      themeSelectEl.appendChild(presetGroup);
+
+      const customIds = Object.keys(customThemes).sort((a, b) => customThemes[a].name.localeCompare(customThemes[b].name));
+      if (customIds.length) {
+        const customGroup = document.createElement('optgroup');
+        customGroup.label = 'Custom';
+        customIds.forEach((id) => {
+          const option = document.createElement('option');
+          option.value = 'custom:' + id;
+          option.textContent = customThemes[id].name;
+          customGroup.appendChild(option);
+        });
+        themeSelectEl.appendChild(customGroup);
+      }
+
+      themeSelectEl.value = themeSelectEl.querySelector('option[value="' + selectedId + '"]') ? selectedId : 'preset:ember';
+    }
+
+    function getThemeRecord(themeId) {
+      const normalizedId = normalizeStoredThemeId(themeId);
+      if (normalizedId.startsWith('custom:')) {
+        const customId = normalizedId.slice(7);
+        const customTheme = customThemes[customId];
+        if (customTheme) {
+          return {
+            id: normalizedId,
+            kind: 'custom',
+            key: customId,
+            label: customTheme.name,
+            values: cloneThemeValues(customTheme.values)
+          };
+        }
+      }
+
+      const presetKey = normalizedId.replace(/^preset:/, '');
+      const preset = PRESET_THEMES[presetKey] || PRESET_THEMES.ember;
+      const resolvedKey = PRESET_THEMES[presetKey] ? presetKey : 'ember';
+      return {
+        id: 'preset:' + resolvedKey,
+        kind: 'preset',
+        key: resolvedKey,
+        label: preset.label,
+        values: cloneThemeValues(preset.values)
+      };
+    }
+
+    function applyTheme(themeId, persist = true) {
+      const record = getThemeRecord(themeId);
+      activeThemeId = record.id;
+      renderThemeOptions(record.id);
+      themeSelectEl.value = record.id;
+      setThemeEditorValues(record.values);
+      customThemeNameEl.value = record.kind === 'custom' ? record.label : '';
+      document.getElementById('deleteThemeBtn').disabled = record.kind !== 'custom';
+      document.body.dataset.theme = record.id.replace(':', '-');
+      applyThemeValues(record.values);
       if (persist) {
-        localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+        localStorage.setItem(ACTIVE_THEME_STORAGE_KEY, record.id);
       }
     }
 
     function loadTheme() {
+      loadCustomThemes();
+      renderThemeOptions('preset:ember');
       try {
-        applyTheme(localStorage.getItem(THEME_STORAGE_KEY) || 'ember', false);
+        applyTheme(normalizeStoredThemeId(localStorage.getItem(ACTIVE_THEME_STORAGE_KEY)), false);
       } catch (_) {
-        applyTheme('ember', false);
+        applyTheme('preset:ember', false);
       }
+    }
+
+    function previewThemeFromInputs() {
+      applyThemeValues(getThemeEditorValues());
+    }
+
+    async function saveCustomTheme() {
+      const requestedName = customThemeNameEl.value.trim().slice(0, 24);
+      if (!requestedName) {
+        playError();
+        setMessage('Enter a custom theme name first');
+        return;
+      }
+
+      const editingCustomId = activeThemeId.startsWith('custom:') ? activeThemeId.slice(7) : '';
+      const existingTheme = editingCustomId ? customThemes[editingCustomId] : null;
+      let targetId = editingCustomId;
+
+      if (!existingTheme || existingTheme.name.toLowerCase() !== requestedName.toLowerCase()) {
+        targetId = buildUniqueCustomThemeId(requestedName, editingCustomId);
+        if (editingCustomId && editingCustomId !== targetId) {
+          delete customThemes[editingCustomId];
+        }
+      }
+
+      customThemes[targetId] = {
+        name: requestedName,
+        values: normalizeThemeValues(getThemeEditorValues())
+      };
+
+      persistCustomThemes();
+      applyTheme('custom:' + targetId);
+      playSuccess();
+      setMessage('Custom theme saved: ' + requestedName);
+    }
+
+    function deleteCustomTheme() {
+      if (!activeThemeId.startsWith('custom:')) {
+        playError();
+        setMessage('Select a custom theme to delete');
+        return;
+      }
+
+      const customId = activeThemeId.slice(7);
+      const themeName = customThemes[customId] ? customThemes[customId].name : 'Custom theme';
+      delete customThemes[customId];
+      persistCustomThemes();
+      applyTheme('preset:ember');
+      playSuccess();
+      setMessage('Deleted custom theme: ' + themeName);
     }
 
     function syncAccessUrls(url, name) {
@@ -806,6 +1307,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
     themeSelectEl.onchange = () => {
       playTap();
       applyTheme(themeSelectEl.value);
+      setMessage('Theme loaded: ' + getThemeRecord(themeSelectEl.value).label);
     };
 
     document.getElementById('renameBtn').onclick = () => {
@@ -823,6 +1325,22 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       saveLcd();
     };
 
+    document.getElementById('saveThemeBtn').onclick = () => {
+      playTap();
+      saveCustomTheme();
+    };
+
+    document.getElementById('deleteThemeBtn').onclick = () => {
+      playTap();
+      deleteCustomTheme();
+    };
+
+    THEME_FIELDS.forEach(({ key }) => {
+      themeInputEls[key].addEventListener('input', () => {
+        previewThemeFromInputs();
+      });
+    });
+
     settingsModalEl.onclick = (event) => {
       if (event.target === settingsModalEl) {
         closeSettings();
@@ -838,7 +1356,6 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
   </script>
 </body>
 </html>
-
 )rawliteral";
 
-#endif
+#endif // WEB_UI_H
