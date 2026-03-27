@@ -36,6 +36,7 @@
 #include <EEPROM.h>
 #include <WiFi.h>
 #include <WebServer.h>
+#include <ESPmDNS.h>
 
 #include <NimBLEDevice.h>
 
@@ -99,6 +100,7 @@ byte colPins[COLS] = { PIN_C1, PIN_C2, PIN_C3 };
 Keypad keypad = Keypad(makeKeymap(keymap), rowPins, colPins, ROWS, COLS);
 
 SafeState safeState;
+static String deviceHostLabel;
 
 // -----------------------------
 // Wi-Fi + HTTP
@@ -124,6 +126,54 @@ static void lcdSetLine(uint8_t line, const String& text) {
   lcd.print("                ");
   lcd.setCursor(0, line);
   lcd.print(t);
+}
+
+static String makeHostLabel(const char* source) {
+  String host;
+  bool lastWasDash = false;
+
+  for (size_t i = 0; source[i] != '\0'; i++) {
+    char c = source[i];
+    if (c >= 'A' && c <= 'Z') c = (char)(c - 'A' + 'a');
+
+    bool isAlphaNum = (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9');
+    if (isAlphaNum) {
+      host += c;
+      lastWasDash = false;
+    } else if (!lastWasDash && host.length() > 0) {
+      host += '-';
+      lastWasDash = true;
+    }
+
+    if (host.length() >= 48) break;
+  }
+
+  while (host.endsWith("-")) {
+    host.remove(host.length() - 1);
+  }
+
+  if (host.length() == 0) {
+    host = "nexgen-safe";
+  }
+
+  return host;
+}
+
+static String localAccessUrl() {
+  if (deviceHostLabel.length() == 0) return "";
+  return String("http://") + deviceHostLabel + ".local";
+}
+
+static char readLoggedKey(const char* context) {
+  char k = keypad.getKey();
+  if (k) {
+    Serial.print("[KEYPAD] ");
+    Serial.print(context);
+    Serial.print(" key='");
+    Serial.print(k);
+    Serial.println("'");
+  }
+  return k;
 }
 
 static bool is4Digits(const String& s) {
@@ -202,7 +252,7 @@ static void httpJson(int code, const String& json) {
 }
 
 static void httpOkStatus() {
-  String json = String("{\"name\":\"") + DEVICE_NAME + "\",\"locked\":" + (safeState.locked() ? "true" : "false") + "}";
+  String json = String("{\"name\":\"") + DEVICE_NAME + "\",\"host\":\"" + deviceHostLabel + ".local\",\"url\":\"" + localAccessUrl() + "\",\"locked\":" + (safeState.locked() ? "true" : "false") + "}";
   httpJson(200, json);
 }
 
@@ -267,6 +317,10 @@ static void setupHttp() {
 
   server.begin();
   Serial.println("HTTP server ready at http://192.168.4.1");
+  if (deviceHostLabel.length()) {
+    Serial.print("HTTP server also advertised at ");
+    Serial.println(localAccessUrl());
+  }
 }
 
 static bool setupWifiAp() {
@@ -279,14 +333,26 @@ static bool setupWifiAp() {
   Serial.print("Requested SSID: ");
   Serial.println(DEVICE_NAME);
 
+  deviceHostLabel = makeHostLabel(DEVICE_NAME);
   WiFi.persistent(false);
   WiFi.disconnect(true, true);
   delay(100);
 
   bool modeOk = WiFi.mode(WIFI_MODE_AP);
   bool configOk = WiFi.softAPConfig(apIp, apGateway, apSubnet);
+  bool hostOk = WiFi.softAPsetHostname(deviceHostLabel.c_str());
   bool apOk = WiFi.softAP(DEVICE_NAME); // open network
   delay(250);
+
+  bool mdnsOk = false;
+  if (apOk) {
+    mdnsOk = MDNS.begin(deviceHostLabel.c_str());
+    if (mdnsOk) {
+      MDNS.setInstanceName(DEVICE_NAME);
+      MDNS.enableWorkstation(ESP_IF_WIFI_AP);
+      MDNS.addService("http", "tcp", 80);
+    }
+  }
 
   IPAddress currentIp = WiFi.softAPIP();
 
@@ -294,12 +360,22 @@ static bool setupWifiAp() {
   Serial.println(modeOk ? "OK" : "FAIL");
   Serial.print("WiFi.softAPConfig: ");
   Serial.println(configOk ? "OK" : "FAIL");
+  Serial.print("WiFi.softAPsetHostname: ");
+  Serial.println(hostOk ? "OK" : "FAIL");
   Serial.print("WiFi.softAP: ");
   Serial.println(apOk ? "OK" : "FAIL");
   Serial.print("Active SSID: ");
   Serial.println(WiFi.softAPSSID());
+  Serial.print("AP hostname: ");
+  Serial.println(deviceHostLabel);
+  Serial.print("mDNS: ");
+  Serial.println(mdnsOk ? "OK" : "FAIL");
   Serial.print("AP IP: ");
   Serial.println(currentIp);
+  if (mdnsOk) {
+    Serial.print("Open via: ");
+    Serial.println(localAccessUrl());
+  }
 
   lcd.clear();
   if (apOk) {
@@ -410,7 +486,7 @@ static void setupBle() {
 // -----------------------------
 // Existing keypad UI logic
 // -----------------------------
-static String readNumericCodeMasked(uint8_t length) {
+static String readNumericCodeMasked(uint8_t length, const char* context) {
   lcd.setCursor(5, 1);
   lcd.print("[____]");
   lcd.setCursor(6, 1);
@@ -420,7 +496,7 @@ static String readNumericCodeMasked(uint8_t length) {
 
   while (code.length() < length) {
     serviceRemoteClients();
-    char k = keypad.getKey();
+    char k = readLoggedKey(context);
     if (k >= '0' && k <= '9') {
       lcd.print('*');
       code += k;
@@ -433,12 +509,12 @@ static bool promptSetNewCode() {
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print("Enter new code:");
-  String newCode = readNumericCodeMasked(CODE_LEN);
+  String newCode = readNumericCodeMasked(CODE_LEN, "new-pin");
 
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print("Confirm new code");
-  String confirm = readNumericCodeMasked(CODE_LEN);
+  String confirm = readNumericCodeMasked(CODE_LEN, "confirm-pin");
 
   if (newCode == confirm) {
     safeState.setCode(newCode);
@@ -453,11 +529,11 @@ static bool promptSetNewCode() {
   return false;
 }
 
-static char waitForKey(char a, char b) {
-  char k = keypad.getKey();
+static char waitForKey(char a, char b, const char* context) {
+  char k = readLoggedKey(context);
   while (k != a && k != b) {
     serviceRemoteClients();
-    k = keypad.getKey();
+    k = readLoggedKey(context);
   }
   return k;
 }
@@ -512,7 +588,7 @@ static void runUnlockedState() {
     lcd.print("Set code to lock");
   }
 
-  char k = waitForKey('*', '#');
+  char k = waitForKey('*', '#', "unlocked-menu");
 
   bool readyToLock = true;
   if (k == '*' || mustSetCode) {
@@ -536,7 +612,7 @@ static void runUnlockedState() {
 static void runLockedState() {
   showLockedBanner();
 
-  String userCode = readNumericCodeMasked(CODE_LEN);
+  String userCode = readNumericCodeMasked(CODE_LEN, "unlock-pin");
 
   bool ok = safeState.unlock(userCode);
   showProgressBar(200);

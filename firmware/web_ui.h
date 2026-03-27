@@ -23,6 +23,8 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
     body{
       margin:0;
       min-height:100vh;
+      display:flex;
+      flex-direction:column;
       font-family:"Segoe UI",Tahoma,Geneva,Verdana,sans-serif;
       color:var(--offwhite);
       background:
@@ -61,9 +63,11 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       color:transparent;
     }
     .wrap{
+      width:100%;
+      flex:1;
       max-width:560px;
       margin:0 auto;
-      padding:18px 16px 28px;
+      padding:18px 16px 12px;
     }
     .card{
       background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
@@ -200,9 +204,13 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       letter-spacing:.14em;
       text-transform:uppercase;
     }
+    .action-tools{
+      margin-top:18px;
+      margin-bottom:26px;
+    }
     .prompt{
       min-height:18px;
-      margin:14px 0 8px;
+      margin:0 0 12px;
       text-align:center;
       font-size:12px;
       letter-spacing:.24em;
@@ -232,6 +240,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       display:grid;
       grid-template-columns:repeat(3,1fr);
       gap:10px;
+      margin-top:8px;
     }
     .key{
       min-height:60px;
@@ -246,6 +255,9 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       margin-top:10px;
     }
     .footer-row button{flex:1}
+    .keypad-actions{
+      margin-top:20px;
+    }
     .modal[hidden]{display:none}
     .modal{
       position:fixed;
@@ -285,6 +297,13 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       font-size:12px;
       line-height:1.5;
     }
+    .settings-label{
+      margin:12px 0 6px;
+      font-size:11px;
+      letter-spacing:.16em;
+      text-transform:uppercase;
+      color:rgba(242,242,240,.52);
+    }
     input{
       width:100%;
       padding:14px;
@@ -294,6 +313,17 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       color:var(--offwhite);
       font-size:15px;
       margin-bottom:10px;
+    }
+    input[readonly]{
+      color:rgba(242,242,240,.78);
+    }
+    .site-footer{
+      padding:0 18px 20px;
+      text-align:center;
+      font-size:12px;
+      letter-spacing:.14em;
+      text-transform:uppercase;
+      color:rgba(242,242,240,.42);
     }
     @media (max-width:460px){
       h1{font-size:28px}
@@ -324,29 +354,37 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
         <button id="lockBtn" class="primary" style="flex:1">Lock</button>
         <button id="unlockBtn" class="tonal" style="flex:1">Unlock</button>
       </div>
-      <div class="footer-row">
+      <div class="footer-row action-tools">
         <button id="setPinBtn" class="ghost">Set PIN</button>
         <button id="settingsBtn" class="ghost">Settings</button>
       </div>
       <div id="prompt" class="prompt"></div>
       <div id="dots" class="dots"></div>
       <div class="grid" id="grid"></div>
-      <div class="footer-row">
+      <div class="footer-row keypad-actions">
         <button id="cancelBtn" class="ghost">Cancel</button>
       </div>
     </div>
   </div>
+
+  <footer class="site-footer">&copy; nexgenstemschool.com.au</footer>
 
   <div id="settingsModal" class="modal" hidden>
     <div class="modal-card">
       <div class="modal-head">
         <div>
           <div class="modal-title">Settings</div>
-          <div class="hint">Write a short message to the safe LCD.</div>
+          <div class="hint">Use the local hostname first. If that does not work on a phone, fall back to the IP.</div>
         </div>
         <button id="settingsCloseBtn" class="ghost small">Close</button>
       </div>
+      <div class="settings-label">Local hostname</div>
+      <input id="localUrl" readonly value="http://nexgensafe-01.local">
+      <div class="settings-label">Fallback IP</div>
+      <input id="ipUrl" readonly value="http://192.168.4.1">
+      <div class="settings-label">LCD line 1</div>
       <input id="l1" placeholder="Line 1" value="Nexgen Safe">
+      <div class="settings-label">LCD line 2</div>
       <input id="l2" placeholder="Line 2" value="Use the browser">
       <div class="row">
         <button id="settingsCancelBtn" class="ghost" style="flex:1">Cancel</button>
@@ -357,6 +395,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
 
   <script>
     const apiBase = location.protocol === 'file:' ? 'http://192.168.4.1' : '';
+    const fallbackUrl = 'http://192.168.4.1';
     const statusCardEl = document.getElementById('statusCard');
     const stateBadgeEl = document.getElementById('stateBadge');
     const nameEl = document.getElementById('name');
@@ -365,6 +404,8 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
     const dotsEl = document.getElementById('dots');
     const gridEl = document.getElementById('grid');
     const settingsModalEl = document.getElementById('settingsModal');
+    const localUrlEl = document.getElementById('localUrl');
+    const ipUrlEl = document.getElementById('ipUrl');
 
     let action = 'none';
     let pin = '';
@@ -426,6 +467,11 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       msgEl.textContent = text || '';
     }
 
+    function syncAccessUrls(url) {
+      localUrlEl.value = url || fallbackUrl;
+      ipUrlEl.value = fallbackUrl;
+    }
+
     function renderDots() {
       dotsEl.innerHTML = '';
       dotsEl.classList.toggle('hidden', action === 'none');
@@ -475,6 +521,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       try {
         const json = await api('/status');
         nameEl.textContent = json.name || 'Nexgen Safe';
+        syncAccessUrls(json.url);
 
         if (json.locked === true) {
           applyStatus('Locked', 'locked');
@@ -491,6 +538,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       } catch (_) {
         applyStatus('Offline', 'offline');
         nameEl.textContent = 'Nexgen Safe';
+        syncAccessUrls('');
         lastLockedState = null;
       }
     }
@@ -646,6 +694,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
 
     buildKeypad();
     resetFlow();
+    syncAccessUrls('');
     refreshStatus();
     setInterval(refreshStatus, 2000);
   </script>
