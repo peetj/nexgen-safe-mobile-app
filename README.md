@@ -7,6 +7,7 @@ Cross-platform (Android + iOS) app that connects to the Nexgen Safe ESP32 from a
 
 Recommended transport for school use:
 - ESP32-hosted Wi-Fi AP at `http://192.168.4.1`
+- WPA2 password is set by `WIFI_PASSWORD` in the Wi-Fi sketch
 
 Also supported:
 - Bluetooth Low Energy (BLE)
@@ -58,5 +59,6 @@ Brand assets are stored in:
 - Physical keypad + LCD remain first-class.
 - Wi-Fi AP mode is the preferred path for school deployment.
 - `wifi` is the browser-first firmware target.
+- The Wi-Fi hotspot is WPA2-protected. Update `DEVICE_NAME` and `WIFI_PASSWORD` in the sketch before distributing units.
 - BLE remains available in the separate `ble` firmware target.
 - PIN is stored on the ESP32 (EEPROM / NVS).

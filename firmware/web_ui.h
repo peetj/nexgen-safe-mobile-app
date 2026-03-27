@@ -25,8 +25,11 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(<!doctype html>
       --glow-hot:rgba(255,94,25,.22);
       --glow-cool:rgba(94,234,212,.14);
       --brand-hot-shadow:rgba(255,94,25,.28);
+      --brand-tag-color:#9d9d9b;
+      --brand-hot-color:#ff8a47;
       --brand-cool-start:#ffe27a;
       --brand-cool-end:#5eead4;
+      --modal-title-color:#f2f2f0;
       --line-soft:rgba(242,242,240,.08);
       --line-strong:rgba(242,242,240,.14);
       --text-mid:rgba(242,242,240,.72);
@@ -81,7 +84,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(<!doctype html>
       font-size:11px;
       letter-spacing:.36em;
       text-transform:uppercase;
-      color:var(--text-subtle);
+      color:var(--brand-tag-color);
       margin-bottom:8px;
     }
     h1{
@@ -93,7 +96,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(<!doctype html>
       font-family:"Arial Black","Trebuchet MS",sans-serif;
     }
     .brand-hot{
-      color:var(--orange-soft);
+      color:var(--brand-hot-color);
       text-shadow:0 0 22px var(--brand-hot-shadow);
     }
     .brand-cool{
@@ -338,6 +341,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(<!doctype html>
       font-weight:900;
       letter-spacing:.08em;
       text-transform:uppercase;
+      color:var(--modal-title-color);
     }
     .hint{
       color:var(--text-low);
@@ -380,6 +384,19 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(<!doctype html>
       margin-top:0;
       padding-top:0;
       border-top:0;
+    }
+    .theme-row{
+      display:flex;
+      gap:10px;
+      align-items:flex-start;
+    }
+    .theme-row select{
+      flex:1;
+      margin-bottom:0;
+    }
+    .theme-row button{
+      flex:0 0 auto;
+      min-width:96px;
     }
     .theme-grid{
       display:grid;
@@ -504,8 +521,11 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(<!doctype html>
       </div>
       <div class="settings-block first">
         <div class="settings-label">Theme</div>
-        <select id="themeSelect"></select>
-        <div id="themeSummary" class="mini-hint">Choose a preset instantly, or open Custom Theme to edit colors.</div>
+        <div class="theme-row">
+          <select id="themeSelect"></select>
+          <button id="editThemeBtn" class="ghost small" type="button" aria-label="Edit custom theme">&#9998; Edit</button>
+        </div>
+        <div id="themeSummary" class="mini-hint">Preset themes switch instantly. Use Edit to reopen your custom theme.</div>
       </div>
       <div class="settings-block">
         <div class="settings-label">Safe name</div>
@@ -515,6 +535,8 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(<!doctype html>
         <input id="localUrl" readonly value="http://nexgensafe-01.local">
         <div class="settings-label">Fallback IP</div>
         <input id="ipUrl" readonly value="http://192.168.4.1">
+        <div class="settings-label">Wi-Fi password</div>
+        <input id="wifiPassword" readonly value="">
       </div>
       <div class="settings-block">
         <div class="settings-label">LCD line 1</div>
@@ -543,6 +565,26 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(<!doctype html>
       <div class="settings-block">
         <div class="settings-label">Colors</div>
         <div class="theme-grid">
+          <div class="theme-color">
+            <label for="colorBrandTag">Header Label</label>
+            <input id="colorBrandTag" type="color" value="#9d9d9b">
+          </div>
+          <div class="theme-color">
+            <label for="colorBrandHot">Nexgen Title</label>
+            <input id="colorBrandHot" type="color" value="#ff8a47">
+          </div>
+          <div class="theme-color">
+            <label for="colorBrandCoolStart">Safe Title Start</label>
+            <input id="colorBrandCoolStart" type="color" value="#ffe27a">
+          </div>
+          <div class="theme-color">
+            <label for="colorBrandCoolEnd">Safe Title End</label>
+            <input id="colorBrandCoolEnd" type="color" value="#5eead4">
+          </div>
+          <div class="theme-color">
+            <label for="colorModalTitle">Dialog Titles</label>
+            <input id="colorModalTitle" type="color" value="#f2f2f0">
+          </div>
           <div class="theme-color">
             <label for="colorBgTop">Page Top</label>
             <input id="colorBgTop" type="color" value="#15181e">
@@ -631,12 +673,14 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(<!doctype html>
     const restartModalEl = document.getElementById('restartModal');
     const restartTextEl = document.getElementById('restartText');
     const themeSelectEl = document.getElementById('themeSelect');
+    const editThemeBtnEl = document.getElementById('editThemeBtn');
     const themeSummaryEl = document.getElementById('themeSummary');
     const customThemeNameEl = document.getElementById('customThemeName');
     const safeNameEl = document.getElementById('safeName');
     const safeNameStatusEl = document.getElementById('safeNameStatus');
     const localUrlEl = document.getElementById('localUrl');
     const ipUrlEl = document.getElementById('ipUrl');
+    const wifiPasswordEl = document.getElementById('wifiPassword');
     const l1El = document.getElementById('l1');
     const l2El = document.getElementById('l2');
     const lcdStatusEl = document.getElementById('lcdStatus');
@@ -645,6 +689,11 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(<!doctype html>
     const CUSTOM_THEME_ID = 'custom';
     const DEFAULT_CUSTOM_THEME_NAME = 'My Safe Theme';
     const THEME_FIELDS = [
+      { key: 'brandTagColor', inputId: 'colorBrandTag' },
+      { key: 'brandHotColor', inputId: 'colorBrandHot' },
+      { key: 'brandCoolStart', inputId: 'colorBrandCoolStart' },
+      { key: 'brandCoolEnd', inputId: 'colorBrandCoolEnd' },
+      { key: 'modalTitleColor', inputId: 'colorModalTitle' },
       { key: 'bgTop', inputId: 'colorBgTop' },
       { key: 'bgBottom', inputId: 'colorBgBottom' },
       { key: 'panelTop', inputId: 'colorPanelTop' },
@@ -663,6 +712,11 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(<!doctype html>
       ember: {
         label: 'Nexgen Ember',
         values: {
+          brandTagColor: '#9d9d9b',
+          brandHotColor: '#ff8a47',
+          brandCoolStart: '#ffe27a',
+          brandCoolEnd: '#5eead4',
+          modalTitleColor: '#f2f2f0',
           bgTop: '#15181e',
           bgBottom: '#0b0d12',
           panelTop: '#22262e',
@@ -681,6 +735,11 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(<!doctype html>
       coast: {
         label: 'Coast Mint',
         values: {
+          brandTagColor: '#8ee8de',
+          brandHotColor: '#67e8f9',
+          brandCoolStart: '#d9fff9',
+          brandCoolEnd: '#38bdf8',
+          modalTitleColor: '#effcfb',
           bgTop: '#0b1720',
           bgBottom: '#041118',
           panelTop: '#14323a',
@@ -699,6 +758,11 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(<!doctype html>
       vault: {
         label: 'Vault Gold',
         values: {
+          brandTagColor: '#e9d58c',
+          brandHotColor: '#fde047',
+          brandCoolStart: '#fff4c2',
+          brandCoolEnd: '#f59e0b',
+          modalTitleColor: '#fff7db',
           bgTop: '#1c1608',
           bgBottom: '#0d0b04',
           panelTop: '#32270e',
@@ -717,6 +781,11 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(<!doctype html>
       midnight: {
         label: 'Midnight Signal',
         values: {
+          brandTagColor: '#b9c6ff',
+          brandHotColor: '#a78bfa',
+          brandCoolStart: '#f0abfc',
+          brandCoolEnd: '#38bdf8',
+          modalTitleColor: '#edf2ff',
           bgTop: '#0b1020',
           bgBottom: '#040712',
           panelTop: '#151b34',
@@ -857,9 +926,12 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(<!doctype html>
         '--amber': theme.amber,
         '--glow-hot': rgba(theme.orange, 0.22),
         '--glow-cool': rgba(theme.cyan, 0.16),
-        '--brand-hot-shadow': rgba(theme.orange, 0.28),
-        '--brand-cool-start': theme.orangeSoft,
-        '--brand-cool-end': theme.cyan,
+        '--brand-tag-color': theme.brandTagColor,
+        '--brand-hot-color': theme.brandHotColor,
+        '--brand-hot-shadow': rgba(theme.brandHotColor, 0.28),
+        '--brand-cool-start': theme.brandCoolStart,
+        '--brand-cool-end': theme.brandCoolEnd,
+        '--modal-title-color': theme.modalTitleColor,
         '--line-soft': rgba(theme.offwhite, 0.08),
         '--line-strong': rgba(theme.offwhite, 0.14),
         '--text-mid': rgba(theme.offwhite, 0.72),
@@ -968,7 +1040,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(<!doctype html>
 
       const customOption = document.createElement('option');
       customOption.value = CUSTOM_THEME_ID;
-      customOption.textContent = 'Custom Theme';
+      customOption.textContent = customTheme && customTheme.name ? 'Custom Theme: ' + customTheme.name : 'Custom Theme';
       themeSelectEl.appendChild(customOption);
       themeSelectEl.value = normalizeStoredThemeId(selectedId);
     }
@@ -976,9 +1048,11 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(<!doctype html>
     function updateThemeSummary() {
       const customLabel = customTheme && customTheme.name ? customTheme.name : DEFAULT_CUSTOM_THEME_NAME;
       if (activeThemeId === CUSTOM_THEME_ID) {
-        themeSummaryEl.textContent = 'Current custom theme: ' + customLabel + '. Choose Custom Theme again to edit colors.';
+        themeSummaryEl.textContent = 'Current custom theme: ' + customLabel + '. Use Edit to adjust it.';
+      } else if (customTheme) {
+        themeSummaryEl.textContent = 'Preset theme active. Use Edit to reopen ' + customLabel + '.';
       } else {
-        themeSummaryEl.textContent = 'Preset theme active. Choose Custom Theme to open the color editor.';
+        themeSummaryEl.textContent = 'Preset theme active. Choose Custom Theme to start building one.';
       }
     }
 
@@ -1099,7 +1173,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(<!doctype html>
         desiredSafeUrl = json.url || fallbackUrl;
         lastSavedSafeName = savedName;
         safeNameDirty = false;
-        syncAccessUrls(json.url, json.name);
+        syncAccessDetails(json.url, json.name, json.password);
         playSuccess();
         if (json.restart_required) {
           safeNameStatusEl.textContent = 'Saved. Restart required to apply the new Wi-Fi name.';
@@ -1170,7 +1244,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(<!doctype html>
       await saveLcdIfNeeded(true);
     }
 
-    function syncAccessUrls(url, name) {
+    function syncAccessDetails(url, name, password) {
       const effectiveName = desiredSafeName || name || 'Nexgen Safe';
       const effectiveUrl = desiredSafeUrl || url || fallbackUrl;
 
@@ -1182,6 +1256,9 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(<!doctype html>
       }
       localUrlEl.value = effectiveUrl;
       ipUrlEl.value = fallbackUrl;
+      if (typeof password === 'string' && password.length) {
+        wifiPasswordEl.value = password;
+      }
     }
 
     function renderDots() {
@@ -1239,7 +1316,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(<!doctype html>
           safeNameStatusEl.textContent = 'Changes save automatically when you leave this field.';
         }
         nameEl.textContent = safeName;
-        syncAccessUrls(json.url, safeName);
+        syncAccessDetails(json.url, safeName, json.password);
 
         if (json.locked === true) {
           applyStatus('Locked', 'locked');
@@ -1256,7 +1333,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(<!doctype html>
       } catch (_) {
         applyStatus('Offline', 'offline');
         nameEl.textContent = 'Nexgen Safe';
-        syncAccessUrls('', 'Nexgen Safe');
+        syncAccessDetails('', 'Nexgen Safe', wifiPasswordEl.value);
         lastLockedState = null;
       }
     }
@@ -1395,6 +1472,11 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(<!doctype html>
       setMessage('Theme loaded: ' + PRESET_THEMES[themeSelectEl.value].label);
     };
 
+    editThemeBtnEl.onclick = async () => {
+      playTap();
+      await openCustomThemeModal();
+    };
+
     document.getElementById('themeBackBtn').onclick = () => {
       playTap();
       closeCustomThemeModal();
@@ -1462,7 +1544,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(<!doctype html>
     buildKeypad();
     resetFlow();
     loadTheme();
-    syncAccessUrls('', 'Nexgen Safe');
+    syncAccessDetails('', 'Nexgen Safe', '');
     refreshStatus();
     setInterval(refreshStatus, 2000);
   </script>

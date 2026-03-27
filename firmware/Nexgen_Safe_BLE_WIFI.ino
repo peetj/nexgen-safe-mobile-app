@@ -4,12 +4,13 @@
   Why Wi-Fi AP:
   - Works on iPhone immediately (Safari can do HTTP; iOS Web Bluetooth is not available)
   - No school Wi-Fi dependency
-  - Security-by-proximity: must join the safe's Wi-Fi to control it
+  - WPA2 hotspot security: must join the safe's Wi-Fi with the shared password to control it
   - Browser-first target; BLE lives in Nexgen_Safe_BLE.ino if needed
 
   Network:
-  - Open AP (no password) as requested
+  - WPA2-PSK AP
   - SSID = DEVICE_NAME
+  - Password = WIFI_PASSWORD
   - IP = 192.168.4.1
 
   HTTP API:
@@ -46,6 +47,8 @@
 // Config
 // -----------------------------
 static const char* DEVICE_NAME = "NexgenSafe-01"; // <-- students change this
+static constexpr char WIFI_PASSWORD[] = "nexgensafe"; // <-- students change this, 8-63 chars
+static_assert(sizeof(WIFI_PASSWORD) - 1 >= 8 && sizeof(WIFI_PASSWORD) - 1 <= 63, "WIFI_PASSWORD must be 8-63 characters");
 
 static const uint8_t LCD_COLS = 16;
 static const uint8_t LCD_ROWS = 2;
@@ -94,6 +97,7 @@ Keypad keypad = Keypad(makeKeymap(keymap), rowPins, colPins, ROWS, COLS);
 SafeState safeState;
 static String deviceNameValue = DEVICE_NAME;
 static String deviceHostLabel;
+static String wifiPasswordValue = WIFI_PASSWORD;
 static bool restartPending = false;
 static unsigned long restartAtMs = 0;
 
@@ -176,6 +180,25 @@ static String makeHostLabel(const char* source) {
 static String localAccessUrl() {
   if (deviceHostLabel.length() == 0) return "";
   return String("http://") + deviceHostLabel + ".local";
+}
+
+static String jsonEscape(const String& raw) {
+  String out;
+  out.reserve(raw.length() + 8);
+
+  for (size_t i = 0; i < raw.length(); i++) {
+    char c = raw[i];
+    switch (c) {
+      case '\\': out += "\\\\"; break;
+      case '"': out += "\\\""; break;
+      case '\n': out += "\\n"; break;
+      case '\r': out += "\\r"; break;
+      case '\t': out += "\\t"; break;
+      default: out += c; break;
+    }
+  }
+
+  return out;
 }
 
 static void applyDeviceName(const String& name) {
@@ -289,7 +312,11 @@ static void httpJson(int code, const String& json) {
 }
 
 static void httpOkStatus() {
-  String json = String("{\"name\":\"") + deviceNameValue + "\",\"host\":\"" + deviceHostLabel + ".local\",\"url\":\"" + localAccessUrl() + "\",\"locked\":" + (safeState.locked() ? "true" : "false") + "}";
+  String json = String("{\"name\":\"") + jsonEscape(deviceNameValue) +
+                "\",\"host\":\"" + jsonEscape(deviceHostLabel + ".local") +
+                "\",\"url\":\"" + jsonEscape(localAccessUrl()) +
+                "\",\"password\":\"" + jsonEscape(wifiPasswordValue) +
+                "\",\"locked\":" + (safeState.locked() ? "true" : "false") + "}";
   httpJson(200, json);
 }
 
@@ -354,7 +381,11 @@ static void setupHttp() {
     Serial.print("Device rename requested: ");
     Serial.println(requestedName);
 
-    String json = String("{\"ok\":true,\"restart_required\":") + (restartRequired ? "true" : "false") + ",\"name\":\"" + requestedName + "\",\"host\":\"" + newHost + ".local\",\"url\":\"" + newUrl + "\"}";
+    String json = String("{\"ok\":true,\"restart_required\":") + (restartRequired ? "true" : "false") +
+                  ",\"name\":\"" + jsonEscape(requestedName) +
+                  "\",\"host\":\"" + jsonEscape(newHost + ".local") +
+                  "\",\"url\":\"" + jsonEscape(newUrl) +
+                  "\",\"password\":\"" + jsonEscape(wifiPasswordValue) + "\"}";
     httpJson(200, json);
   });
 
@@ -401,7 +432,7 @@ static bool setupWifiAp() {
   bool modeOk = WiFi.mode(WIFI_MODE_AP);
   bool configOk = WiFi.softAPConfig(apIp, apGateway, apSubnet);
   bool hostOk = WiFi.softAPsetHostname(deviceHostLabel.c_str());
-  bool apOk = WiFi.softAP(deviceNameValue.c_str()); // open network
+  bool apOk = WiFi.softAP(deviceNameValue.c_str(), wifiPasswordValue.c_str());
   delay(250);
 
   bool mdnsOk = false;
@@ -426,6 +457,8 @@ static bool setupWifiAp() {
   Serial.println(apOk ? "OK" : "FAIL");
   Serial.print("Active SSID: ");
   Serial.println(WiFi.softAPSSID());
+  Serial.print("WPA2 password: ");
+  Serial.println(wifiPasswordValue);
   Serial.print("Active device name: ");
   Serial.println(deviceNameValue);
   Serial.print("AP hostname: ");
@@ -443,7 +476,10 @@ static bool setupWifiAp() {
   if (apOk) {
     lcdSetLine(0, "WiFi: " + deviceNameValue);
     lcdSetLine(1, "IP: " + currentIp.toString());
-    delay(1500);
+    delay(1400);
+    lcdSetLine(0, "WiFi password");
+    lcdSetLine(1, wifiPasswordValue);
+    delay(1400);
   } else {
     lcdSetLine(0, "WiFi AP failed");
     lcdSetLine(1, "Check serial log");
