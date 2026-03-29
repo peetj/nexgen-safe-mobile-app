@@ -37,12 +37,14 @@ Brand assets are stored in:
   - `.\fw.ps1 build wifi -PartitionScheme huge_app`
   - `.\fw.ps1 upload wifi -Port COM5`
   - `.\fw.ps1 monitor -Port COM5`
+  - `.\fw.ps1 package wifi`
   - `.\fw.ps1 list-ports`
 - Bash wrapper for Git Bash / WSL-on-Windows:
   - `bash ./fw.sh build`
   - `bash ./fw.sh build wifi -PartitionScheme huge_app`
   - `bash ./fw.sh build ble -DeviceName NexgenSafe-02`
   - `bash ./fw.sh upload wifi -Port COM5`
+  - `bash ./fw.sh package wifi`
   - `bash ./fw.sh list-ports`
 - Defaults:
   - target = `wifi`
@@ -52,6 +54,10 @@ Brand assets are stored in:
   - `.\fw.ps1 build wifi -DeviceName NexgenSafe-02`
 - Optional partition scheme override at build/upload time:
   - `.\fw.ps1 upload wifi -Port COM5 -PartitionScheme no_ota`
+- Package a student-ready Arduino IDE zip:
+  - `.\fw.ps1 package wifi`
+  - output: `build/firmware/packages/nexgen-safe-wifi.zip`
+  - extracts to: `Nexgen_Safe_BLE_Wifi/`
 - Build artifacts and temporary sketch folders are written under `build/firmware/`.
 
 ## Notes

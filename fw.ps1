@@ -1,6 +1,6 @@
 param(
   [Parameter(Position = 0)]
-  [ValidateSet("build", "upload", "monitor", "list-ports", "help")]
+  [ValidateSet("build", "upload", "monitor", "package", "list-ports", "help")]
   [string]$Command = "help",
 
   [Parameter(Position = 1)]
@@ -25,6 +25,7 @@ Usage:
   .\fw.ps1 build [wifi|ble] [-DeviceName NAME] [-Board FQBN] [-PartitionScheme NAME] [-Clean]
   .\fw.ps1 upload [wifi|ble] [-Port COM5] [-DeviceName NAME] [-Board FQBN] [-PartitionScheme NAME] [-Clean]
   .\fw.ps1 monitor [wifi|ble] [-Port COM5] [-Board FQBN]
+  .\fw.ps1 package [wifi|ble] [-DeviceName NAME]
   .\fw.ps1 list-ports
 
 Examples:
@@ -32,6 +33,7 @@ Examples:
   .\fw.ps1 build wifi -PartitionScheme huge_app
   .\fw.ps1 build ble -DeviceName NexgenSafe-02
   .\fw.ps1 upload wifi -Port COM5
+  .\fw.ps1 package wifi
   .\fw.ps1 monitor -Port COM5
 "@ | Write-Host
 }
@@ -62,6 +64,9 @@ function Get-TargetConfig {
         Name = "wifi"
         SketchName = "Nexgen_Safe_BLE_WIFI"
         SketchFile = "Nexgen_Safe_BLE_WIFI.ino"
+        PackageSketchName = "Nexgen_Safe_BLE_Wifi"
+        PackageSketchFile = "Nexgen_Safe_BLE_Wifi.ino"
+        PackageName = "nexgen-safe-wifi"
         DefaultPartitionScheme = "huge_app"
         Dependencies = @(
           "SafeState.h",
@@ -77,6 +82,9 @@ function Get-TargetConfig {
         Name = "ble"
         SketchName = "Nexgen_Safe_BLE"
         SketchFile = "Nexgen_Safe_BLE.ino"
+        PackageSketchName = "Nexgen_Safe_BLE"
+        PackageSketchFile = "Nexgen_Safe_BLE.ino"
+        PackageName = "nexgen-safe-ble"
         DefaultPartitionScheme = "default"
         Dependencies = @(
           "SafeState.h",
@@ -215,7 +223,7 @@ function Invoke-ArduinoCli {
 }
 
 $config = $null
-if ($Command -in @("build", "upload", "monitor")) {
+if ($Command -in @("build", "upload", "monitor", "package")) {
   $config = Get-TargetConfig -Name $Target
 }
 
@@ -309,5 +317,49 @@ switch ($Command) {
 
     Write-Host ("Opening serial monitor on {0}" -f $resolvedPort)
     Invoke-ArduinoCli -Arguments $arguments
+  }
+
+  "package" {
+    $workspace = Prepare-SketchWorkspace -Config $config -NameOverride $DeviceName
+    $packagesDir = Join-Path $PSScriptRoot "build\firmware\packages"
+    $stagingDir = Join-Path $packagesDir "staging"
+    $packageSketchRoot = Join-Path $stagingDir $config.PackageSketchName
+    $packageSketchFile = $config.PackageSketchFile
+    $zipPath = Join-Path $packagesDir ("{0}.zip" -f $config.PackageName)
+
+    New-Item -ItemType Directory -Path $packagesDir -Force | Out-Null
+    if (Test-Path -LiteralPath $stagingDir) {
+      Remove-Item -LiteralPath $stagingDir -Recurse -Force
+    }
+    New-Item -ItemType Directory -Path $stagingDir -Force | Out-Null
+
+    if (Test-Path -LiteralPath $zipPath) {
+      Remove-Item -LiteralPath $zipPath -Force
+    }
+
+    New-Item -ItemType Directory -Path $packageSketchRoot -Force | Out-Null
+    Get-ChildItem -LiteralPath $workspace | ForEach-Object {
+      if ($_.Name -ne $config.SketchFile) {
+        Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $packageSketchRoot $_.Name) -Recurse -Force
+      }
+    }
+
+    $packagedSketchContent = Get-Content -LiteralPath (Join-Path $workspace $config.SketchFile) -Raw
+    [System.IO.File]::WriteAllText((Join-Path $packageSketchRoot $packageSketchFile), $packagedSketchContent, [System.Text.UTF8Encoding]::new($false))
+
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    [System.IO.Compression.ZipFile]::CreateFromDirectory(
+      $packageSketchRoot,
+      $zipPath,
+      [System.IO.Compression.CompressionLevel]::Optimal,
+      $true
+    )
+    Remove-Item -LiteralPath $packageSketchRoot -Recurse -Force
+
+    Write-Host ("Packaged {0} firmware sketch to {1}" -f $config.Name, $zipPath)
+    Write-Host ("Zip expands to sketch folder: {0}" -f $config.PackageSketchName)
+    if ($DeviceName) {
+      Write-Host ("Using DEVICE_NAME override: {0}" -f $DeviceName)
+    }
   }
 }
